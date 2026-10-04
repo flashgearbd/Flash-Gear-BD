@@ -6,37 +6,37 @@
 
   const products = [
     {
-      id: "FG-001", name: "20W Fast Charger", brand: "Baseus", category: "Chargers",
+      id: "FG-001", name: "20W Fast Charger", brand: "Baseus", category: "Charger",
       price: 1200, oldPrice: 1450, badge: "Sale", stock: "In Stock",
       image: "", description: "Compact fast charger for everyday mobile use.",
       variant: "20W"
     },
     {
-      id: "FG-002", name: "Type-C Braided Cable", brand: "Baseus", category: "Cables",
+      id: "FG-002", name: "Type-C Braided Cable", brand: "Baseus", category: "Cable & Adapter",
       price: 500, oldPrice: 650, badge: "Popular", stock: "Low Stock",
       image: "", description: "Durable braided Type-C charging and data cable.",
       variant: "1m"
     },
     {
-      id: "FG-003", name: "Premium Phone Case", brand: "Flash Gear", category: "Cases",
+      id: "FG-003", name: "Premium Phone Case", brand: "Flash Gear", category: "Gadget & Accessories",
       price: 850, oldPrice: 999, badge: "New", stock: "In Stock",
       image: "", description: "Slim protective case with a clean premium finish.",
       variant: "iPhone 15"
     },
     {
-      id: "FG-004", name: "10,000mAh Power Bank", brand: "Anker", category: "Power Banks",
+      id: "FG-004", name: "10,000mAh Power Bank", brand: "Anker", category: "Powerbank",
       price: 2600, oldPrice: 2900, badge: "", stock: "In Stock",
       image: "", description: "Portable power for your daily travel and work.",
       variant: "10,000mAh"
     },
     {
-      id: "FG-005", name: "Wireless Earbuds", brand: "Xiaomi", category: "Earphones",
+      id: "FG-005", name: "Wireless Earbuds", brand: "Xiaomi", category: "Earbuds",
       price: 2200, oldPrice: 2500, badge: "New", stock: "Low Stock",
       image: "", description: "Comfortable wireless earbuds for calls and music.",
       variant: "White"
     },
     {
-      id: "FG-006", name: "Smart Watch", brand: "Xiaomi", category: "Smart Watches",
+      id: "FG-006", name: "Smart Watch", brand: "Xiaomi", category: "Smart watch",
       price: 3900, oldPrice: 4300, badge: "Popular", stock: "Out of Stock",
       image: "", description: "Everyday smart watch with fitness and notification features.",
       variant: "Black"
@@ -44,9 +44,18 @@
   ];
 
   const categories = [
-    ["Smartphones", "📱"], ["Accessories", "🎧"], ["Chargers", "🔌"],
-    ["Cables", "🔗"], ["Cases", "🛡️"], ["Earphones", "🎵"],
-    ["Power Banks", "🔋"], ["Smart Watches", "⌚"]
+    ["Mobile", "📱", true], ["Feature Phone", "☎️", true],
+    ["Gadget & Accessories", "🎧", false], ["Charger", "🔌", false],
+    ["Cable & Adapter", "🔗", false], ["Powerbank", "🔋", false],
+    ["Earbuds", "🎧", false], ["Neckband", "🎶", false],
+    ["Headphones", "🎧", false], ["Microphone", "🎙️", false],
+    ["Speaker", "🔊", false], ["Smart watch", "⌚", false]
+  ];
+
+  const gadgetSubcategories = [
+    ["Charger", "🔌"], ["Cable & Adapter", "🔗"], ["Powerbank", "🔋"],
+    ["Earbuds", "🎧"], ["Neckband", "🎶"], ["Headphones", "🎧"],
+    ["Microphone", "🎙️"], ["Speaker", "🔊"], ["Smart watch", "⌚"]
   ];
 
   let cart = JSON.parse(localStorage.getItem("fgbd_cart") || "[]");
@@ -102,7 +111,7 @@
           </nav>
           <div class="header-search">
             <form class="header-search-form" onsubmit="submitHeaderSearch(event)">
-              <button class="header-search-icon" type="button" aria-label="Search">⌕</button>
+              <span class="header-search-icon" aria-hidden="true">⌕</span>
               <input id="headerSearch" value="${escapeHtml(currentSearch)}" autocomplete="off" placeholder="Search products..." aria-label="Search products">
               <button class="header-search-submit" type="submit" aria-label="Search">⌕</button>
             </form>
@@ -152,18 +161,14 @@
           <div class="hero-copy">
             <span class="eyebrow">TRUSTED MOBILE & ACCESSORIES STORE</span>
             <h1>Premium Tech.<br><span>Better Together.</span></h1>
-            <p>Smartphones and accessories selected for everyday life, backed by simple service and easy checkout.</p>
+            <p>Smartphones are coming soon. Until then, explore our latest gadgets & accessories with easy checkout and simple service.</p>
             <div class="hero-actions">
               <a class="btn primary" href="#shop">Shop Now</a>
               <a class="btn ghost" href="#track">Track Order</a>
             </div>
           </div>
-          <div class="hero-art">
-            <div class="glow"></div>
-            <div class="hero-device">📱</div>
-            <div class="hero-device small">🎧</div>
-            <div class="hero-device cable">🔌</div>
-          </div>
+          <div class="hero-art" aria-hidden="true"></div>
+          <div class="hero-blend" aria-hidden="true"></div>
         </section>
 
         <section class="trust-strip">
@@ -175,8 +180,10 @@
 
         <section class="section">
           <div class="section-head"><div><span class="eyebrow">EXPLORE</span><h2>Shop by Category</h2></div><a href="#shop">View All →</a></div>
-          <div class="category-grid">${categories.map(([name, icon]) =>
-            `<a class="category-card" href="#shop?category=${encodeURIComponent(name)}"><span>${icon}</span><b>${name}</b></a>`
+          <div class="category-grid">${categories.map(([name, icon, coming]) =>
+            coming
+              ? `<a class="category-card coming" href="#shop?category=${encodeURIComponent(name)}"><span>${icon}</span><b>${name}</b><small>Coming Later</small></a>`
+              : `<a class="category-card" href="#shop?category=${encodeURIComponent(name)}"><span>${icon}</span><b>${name}</b></a>`
           ).join("")}</div>
         </section>
 
@@ -203,9 +210,11 @@
   }
 
   function shopPage() {
+    const isComingSoon = currentCategory === "Mobile" || currentCategory === "Feature Phone";
+    const showGadgetSubcategories = currentCategory === "Gadget & Accessories";
     const filtered = products.filter(p => {
       const matchesSearch = !currentSearch || `${p.name} ${p.brand} ${p.category}`.toLowerCase().includes(currentSearch.toLowerCase());
-      const matchesCat = currentCategory === "All" || p.category === currentCategory;
+      const matchesCat = currentCategory === "All" || currentCategory === "Gadget & Accessories" || p.category === currentCategory;
       return matchesSearch && matchesCat;
     });
     return `
@@ -215,15 +224,17 @@
         <div class="searchbar"><input id="shopSearch" value="${escapeHtml(currentSearch)}" placeholder="Search products..." oninput="setSearch(this.value)"><button>⌕</button></div>
         <div class="chips">
           <button class="${currentCategory==="All"?"active":""}" onclick="setCategory('All')">All</button>
-          ${categories.map(([name]) => `<button class="${currentCategory===name?"active":""}" onclick="setCategory('${name.replace(/'/g,"\\'")}')">${name}</button>`).join("")}
+          ${categories.map(([name,,coming]) => `<button class="${currentCategory===name?"active":""}" onclick="setCategory('${name.replace(/'/g,"\'")}')">${name}${coming ? " · Coming Later" : ""}</button>`).join("")}
         </div>
+        ${showGadgetSubcategories ? `<div class="subcategory-panel"><b>Gadget & Accessories</b><span>Choose a category</span><div class="chips subchips">${gadgetSubcategories.map(([name,icon])=>`<button onclick="setCategory('${name.replace(/'/g,"\'")}')">${icon} ${name}</button>`).join("")}</div></div>` : ""}
+        ${isComingSoon ? `<div class="coming-soon-card"><div class="coming-soon-icon">⚡</div><span class="eyebrow">COMING LATER</span><h2>We’re currently working on our ${currentCategory.toLowerCase()} inventory.</h2><p>Until then, explore our latest gadgets & accessories.</p><a class="btn primary" href="#shop?category=Gadget%20%26%20Accessories">Explore Gadgets & Accessories</a></div>` : `
         <div class="shop-layout">
           <aside class="filter-panel">
             <b>Filter</b><label>Brand</label><select><option>All Brands</option><option>Apple</option><option>Samsung</option><option>Xiaomi</option><option>Baseus</option><option>Anker</option></select>
             <label>Availability</label><label class="check"><input type="checkbox"> In Stock</label><label class="check"><input type="checkbox"> Low Stock</label>
           </aside>
           <section><div class="results-head"><span>${filtered.length} products</span><select><option>Recommended</option><option>Price: Low to High</option><option>Price: High to Low</option><option>Newest</option></select></div><div class="product-grid">${filtered.length ? filtered.map(productCard).join("") : `<div class="empty">No products found.</div>`}</div></section>
-        </div>
+        </div>`}
       </main>${footer()}${bottomNav()}`;
   }
 
@@ -275,19 +286,21 @@
     const total = cart.reduce((s, item) => s + item.price * item.qty, 0);
     return `
       ${header()}<main class="page narrow"><div class="steps"><b>1 Customer</b><span>2 Delivery</span><span>3 Payment</span></div>
-      <section class="form-card"><span class="eyebrow">CHECKOUT</span><h1>Customer Information</h1>
-        <label>Full Name *<input id="name" placeholder="Enter your full name"></label>
-        <label>Mobile Number *<input id="phone" placeholder="+880 1XXX-XXXXXX"></label>
-        <label>Email <small>(Optional)</small><input id="email" placeholder="you@example.com"></label>
+      <section class="form-card checkout-form" oninput="handleCheckoutInput(event)" onfocusout="validateCheckoutField(event)"><span class="eyebrow">CHECKOUT</span><h1>Customer Information</h1>
+        <label data-field="name">Full Name *<input id="name" autocomplete="name" placeholder="Enter your full name"></label>
+        <label data-field="phone">Mobile Number *<div class="phone-field"><span>+88</span><input id="phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="11" placeholder="01XXXXXXXXX" aria-describedby="phone-help"></div><small id="phone-help" class="field-hint">Enter exactly 11 digits starting with 01.</small></label>
+        <label data-field="email">Email <small>(Optional)</small><input id="email" type="email" autocomplete="email" placeholder="you@example.com"></label>
         <h2>Delivery Information</h2>
-        <div class="two"><label>District *<select id="district"><option>Chattogram</option><option>Dhaka</option><option>Cox's Bazar</option><option>Other</option></select></label><label>Area *<input id="area" placeholder="Area / Thana"></label></div>
-        <label>Full Address *<textarea id="address" placeholder="House/Flat, Road, Area, Landmark"></textarea></label>
-        <label>Delivery Note <small>(Optional)</small><textarea id="note" placeholder="Any special instructions..."></textarea></label>
+        <div class="two"><label data-field="division">Division *<select id="division"><option value="">Select Division</option><option>Chattogram</option><option>Dhaka</option><option>Rajshahi</option><option>Khulna</option><option>Barishal</option><option>Sylhet</option><option>Rangpur</option><option>Mymensingh</option></select></label><label data-field="district">District *<select id="district"><option value="">Select District</option><option>Chattogram</option><option>Dhaka</option><option>Cox's Bazar</option><option>Other</option></select></label></div>
+        <label data-field="area">Area / Thana *<input id="area" placeholder="Area / Thana"></label>
+        <label data-field="address">Full Delivery Address *<textarea id="address" placeholder="House/Flat, Road, Area, Landmark"></textarea></label>
+        <label data-field="note">Delivery Note <small>(Optional)</small><textarea id="note" placeholder="Any special instructions..."></textarea></label>
         <h2>Payment Method</h2>
         <div class="payment-options">
-          ${["Cash on Delivery","bKash","Nagad","Upay","Bank Transfer"].map((x,i)=>`<label class="payment"><input type="radio" name="payment" value="${x}" ${i===0?"checked":""}><span>${["💵","🩷","🟠","🔵","🏦"][i]}</span><b>${x}</b><small>${i===0?"Pay when you receive the product":"Pay securely using "+x}</small></label>`).join("")}
+          ${["Cash on Delivery","bKash","Nagad","Upay","Bank Transfer"].map((x,i)=>`<label class="payment"><input type="radio" name="payment" value="${x}" ${i===0?"checked":""}><span>${["💵","🩷","🟠","🔵","🏦"][i]}</span><b>${x}</b><small>${i===0?"Pay when you receive the product":`Pay securely using ${x}`}</small></label>`).join("")}
         </div>
-        <div class="summary checkout-summary"><div><span>Subtotal</span><b>${money(total)}</b></div><div><span>Delivery</span><b>Calculated after address</b></div><hr><div class="grand"><span>Total</span><b>${money(total)}</b></div><button class="btn primary full" onclick="placeDemoOrder()">Place Order</button><small class="legal">By placing your order, you agree to our Terms & Conditions and Privacy Policy.</small></div>
+        <div class="delivery-note-card"><b>🚚 Delivery</b><span>Inside Chattogram City: ${money(60)} · Outside Chattogram City: ${money(120)}</span><span class="free-delivery-progress" id="freeDeliveryMessage">Free delivery eligibility is checked automatically.</span></div>
+        <div class="summary checkout-summary"><div><span>Subtotal</span><b>${money(total)}</b></div><div><span>Delivery</span><b id="deliveryAmount">Calculated after address</b></div><hr><div class="grand"><span>Total</span><b id="checkoutGrandTotal">${money(total)}</b></div><button id="placeOrderBtn" class="btn primary full order-submit" type="button" disabled onclick="placeDemoOrder()">Place Order</button><small class="legal">All required fields must be completed correctly. By placing your order, you agree to our Terms & Conditions and Privacy Policy.</small></div>
       </section></main>${footer()}${bottomNav()}`;
   }
 
@@ -297,7 +310,7 @@
 
   function trackPage() {
     return `${header()}<main class="page narrow"><section class="page-head"><span class="eyebrow">ORDER TRACKING</span><h1>Track your order.</h1><p>Enter your Order ID and phone number to view your latest status.</p></section>
-      <div class="form-card"><label>Order ID<input placeholder="e.g. FG-10258"></label><label>Phone Number<input placeholder="+880 1XXX-XXXXXX"></label><button class="btn primary full" onclick="showDemoTracking()">Track Order</button></div>
+      <div class="form-card"><label>Order ID<input placeholder="e.g. FG-10258"></label><label>Phone Number<div class="phone-field"><span>+88</span><input inputmode="numeric" maxlength="11" placeholder="01XXXXXXXXX"></div></label><button class="btn primary full" onclick="showDemoTracking()">Track Order</button></div>
       <div id="tracking-result"></div></main>${footer()}${bottomNav()}`;
   }
 
@@ -310,7 +323,7 @@
   }
 
   function supportPage() {
-    return `${header()}<main class="page narrow"><section class="page-head"><span class="eyebrow">SUPPORT</span><h1>Need Help?</h1><p>Choose the easiest way to reach Flash Gear BD.</p></section><div class="support-list"><a href="#"><span>🟢</span><div><b>WhatsApp</b><small>Chat with us</small></div><strong>→</strong></a><a href="tel:+8801000000000"><span>📞</span><div><b>Call Us</b><small>+880 1XXX-XXXXXX</small></div><strong>→</strong></a><a href="mailto:support@flashgearbd.com"><span>✉️</span><div><b>Email</b><small>support@flashgearbd.com</small></div><strong>→</strong></a></div><div class="help-banner">🛟 <b>We’re here for you</b><span>Customer support made simple.</span></div></main>${footer()}${bottomNav()}`;
+    return `${header()}<main class="page narrow"><section class="page-head"><span class="eyebrow">SUPPORT</span><h1>Need Help?</h1><p>We’re here every day from 11 AM – 9 PM.</p></section><div class="support-list"><a href="https://wa.me/8801891656945" target="_blank" rel="noopener"><span>🟢</span><div><b>WhatsApp</b><small>01891656945</small></div><strong>→</strong></a><a href="tel:+8801601093553"><span>📞</span><div><b>Call Us</b><small>+8801601093553</small></div><strong>→</strong></a><a href="mailto:flashgearbd@gmail.com"><span>✉️</span><div><b>Email</b><small>flashgearbd@gmail.com</small></div><strong>→</strong></a></div><div class="help-banner">📍 <b>Visit Flash Gear BD</b><span>Meridian Kohinoor City Level 5, 537 No. Shop · 11 AM – 9 PM</span></div></main>${footer()}${bottomNav()}`;
   }
 
   function faqPage() {
@@ -325,7 +338,7 @@
   }
 
   function footer() {
-    return `<footer><div class="footer-brand"><img src="${logo}" alt=""><div><b>FLASH GEAR BD</b><span>Mobile & Accessories Store</span></div></div><div class="footer-grid"><div><b>Shop</b><a href="#shop">All Products</a><a href="#offers">Offers</a></div><div><b>Help</b><a href="#track">Track Order</a><a href="#support">Support</a><a href="#faq">FAQ</a></div><div><b>Policies</b><a href="#returns">Returns</a><a href="#privacy">Privacy</a><a href="#terms">Terms</a></div></div><small>© ${new Date().getFullYear()} Flash Gear BD. All rights reserved.</small></footer>`;
+    return `<footer><div class="footer-brand"><img src="${logo}" alt="Flash Gear BD"><div><b>FLASH GEAR BD</b><span>Mobile & Accessories Store</span></div></div><div class="footer-grid"><div><b>Shop</b><a href="#shop">All Products</a><a href="#offers">Offers</a><a href="#track">Track Order</a></div><div><b>Help</b><a href="#support">Support</a><a href="#faq">FAQ</a><a href="tel:+8801601093553">+8801601093553</a></div><div><b>Visit</b><span>Meridian Kohinoor City Level 5, 537 No. Shop</span><span>11 AM – 9 PM</span><span>Chattogram, Bangladesh</span></div></div><div class="footer-payment"><b>Payment:</b> Cash on Delivery · bKash · Nagad · Upay · Bank Transfer</div><small>© ${new Date().getFullYear()} Flash Gear BD. All rights reserved.</small></footer>`;
   }
 
   function addToCart(id) {
@@ -358,12 +371,83 @@
   function setCategory(v) { currentCategory = v; render(); }
   function toggleMenu() { document.getElementById("main-menu")?.classList.toggle("open"); }
 
+  const requiredCheckoutFields = ["name", "phone", "division", "district", "area", "address"];
+
+  function phoneIsValid() {
+    const digits = (document.getElementById("phone")?.value || "").replace(/\D/g, "");
+    return /^01\d{9}$/.test(digits);
+  }
+
+  function getCheckoutFieldValid(id) {
+    const el = document.getElementById(id);
+    if (!el) return false;
+    if (id === "phone") return phoneIsValid();
+    return String(el.value || "").trim().length > 0;
+  }
+
+  function markCheckoutField(id, invalid) {
+    const el = document.getElementById(id);
+    const wrap = el?.closest("[data-field]");
+    if (!wrap) return;
+    wrap.classList.toggle("field-invalid", Boolean(invalid));
+    el.setAttribute("aria-invalid", invalid ? "true" : "false");
+  }
+
+  function handleCheckoutInput(event) {
+    const target = event?.target;
+    if (target?.id && requiredCheckoutFields.includes(target.id)) {
+      const hasValue = String(target.value || "").trim().length > 0;
+      markCheckoutField(target.id, hasValue && !getCheckoutFieldValid(target.id));
+      const index = requiredCheckoutFields.indexOf(target.id);
+      if (index > 0) {
+        const previousId = requiredCheckoutFields[index - 1];
+        if (!getCheckoutFieldValid(previousId)) markCheckoutField(previousId, true);
+      }
+    }
+    validateCheckout();
+  }
+
+  function validateCheckoutField(event) {
+    const target = event?.target;
+    if (!target?.id || !requiredCheckoutFields.includes(target.id)) return;
+    markCheckoutField(target.id, !getCheckoutFieldValid(target.id));
+
+    const index = requiredCheckoutFields.indexOf(target.id);
+    if (index > 0) {
+      const previousId = requiredCheckoutFields[index - 1];
+      if (!getCheckoutFieldValid(previousId)) markCheckoutField(previousId, true);
+    }
+    validateCheckout();
+  }
+
+  function validateCheckout() {
+    const btn = document.getElementById("placeOrderBtn");
+    if (!btn) return false;
+    const valid = requiredCheckoutFields.every(getCheckoutFieldValid);
+    btn.disabled = !valid;
+    btn.classList.toggle("is-disabled", !valid);
+    const message = document.getElementById("freeDeliveryMessage");
+    if (message) {
+      const total = cart.reduce((s, item) => s + item.price * item.qty, 0);
+      const itemCount = cart.reduce((count, item) => count + Number(item.qty || 0), 0);
+      const eligible = total > 6499 || (itemCount >= 2 && cart.some(item => Number(item.price) >= 1500));
+      message.textContent = eligible ? "🎉 Congratulations! You unlocked FREE DELIVERY." : `You're ${money(Math.max(0, 6500 - total))} away from FREE DELIVERY! 🎉`;
+    }
+    return valid;
+  }
+
   function placeDemoOrder() {
-    if (!document.getElementById("name")?.value || !document.getElementById("phone")?.value || !document.getElementById("address")?.value) {
-      toast("Please fill in name, phone and address.");
+    if (!validateCheckout()) {
+      const firstInvalid = requiredCheckoutFields.find(id => !getCheckoutFieldValid(id));
+      if (firstInvalid) {
+        markCheckoutField(firstInvalid, true);
+        document.getElementById(firstInvalid)?.focus();
+      }
+      toast("Please complete the highlighted required field.");
       return;
     }
     window.demoTotal = cart.reduce((s, item) => s + item.price * item.qty, 0);
+    window.demoPhone = "+88" + document.getElementById("phone").value.trim();
     cart = []; saveCart(); location.hash = "#confirmed";
   }
 
@@ -406,6 +490,7 @@
     void app.offsetWidth;
     app.classList.add("page-enter");
     updateCartCount();
+    if (path === "checkout") validateCheckout();
     window.scrollTo({top:0, behavior:"auto"});
   }
 
@@ -420,6 +505,9 @@
   window.changeTempQty = changeTempQty;
   window.placeDemoOrder = placeDemoOrder;
   window.showDemoTracking = showDemoTracking;
+  window.handleCheckoutInput = handleCheckoutInput;
+  window.validateCheckout = validateCheckout;
+  window.validateCheckoutField = validateCheckoutField;
 
   window.addEventListener("hashchange", render);
   render();

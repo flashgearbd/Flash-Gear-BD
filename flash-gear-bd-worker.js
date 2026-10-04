@@ -1,6 +1,6 @@
 /**
  * FLASH GEAR BD — Cloudflare Worker API Gateway
- * FGBD V1.0.5
+ * FGBD V1.0.6
  *
  * Secrets to configure in Cloudflare:
  *   APPS_SCRIPT_URL = your deployed Google Apps Script Web App URL
@@ -23,7 +23,10 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    if (url.pathname.startsWith('/api/')) {
+    // Support both /api?action=... and /api/... styles.
+    // The website currently uses /api?action=..., while /api/... remains
+    // supported for direct REST-style calls.
+    if (url.pathname === '/api' || url.pathname === '/api/' || url.pathname.startsWith('/api/')) {
       return handleApi(request, env, url);
     }
 
@@ -36,7 +39,8 @@ async function handleApi(request, env, url) {
     return json({ ok: false, error: 'Backend is not configured yet.' }, 503);
   }
 
-  const action = url.pathname.replace(/^\/api\//, '').replace(/\/$/, '') || 'health';
+  const pathAction = url.pathname.replace(/^\/api\//, '').replace(/\/$/, '');
+  const action = url.searchParams.get('action') || pathAction || 'health';
   const target = new URL(env.APPS_SCRIPT_URL);
   target.searchParams.set('action', action);
 

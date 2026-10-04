@@ -4,7 +4,7 @@
   const CFG = window.FLASH_GEAR_CONFIG || {};
   const logo = "./flash-gear-logo.png";
 
-  const products = [
+  let products = [
     {
       id: "FG-001", name: "20W Fast Charger", brand: "Baseus", category: "Charger",
       price: 1200, oldPrice: 1450, badge: "Sale", stock: "In Stock",
@@ -52,6 +52,18 @@
     ["Speaker", "🔊", false], ["Smart watch", "⌚", false]
   ];
 
+  // Bangladesh: 8 divisions and 64 districts. District options are filtered by selected division.
+  const bangladeshDistricts = {
+    "Dhaka": ["Dhaka", "Faridpur", "Gazipur", "Gopalganj", "Kishoreganj", "Madaripur", "Manikganj", "Munshiganj", "Narayanganj", "Narsingdi", "Rajbari", "Shariatpur", "Tangail"],
+    "Khulna": ["Bagerhat", "Chuadanga", "Jashore", "Jhenaidah", "Khulna", "Kushtia", "Magura", "Meherpur", "Narail", "Satkhira"],
+    "Chattogram": ["Bandarban", "Brahmanbaria", "Chandpur", "Chattogram", "Cumilla", "Cox's Bazar", "Feni", "Khagrachhari", "Lakshmipur", "Noakhali", "Rangamati"],
+    "Rajshahi": ["Bogura", "Joypurhat", "Naogaon", "Natore", "Chapainawabganj", "Pabna", "Rajshahi", "Sirajganj"],
+    "Sylhet": ["Habiganj", "Moulvibazar", "Sunamganj", "Sylhet"],
+    "Rangpur": ["Dinajpur", "Gaibandha", "Kurigram", "Lalmonirhat", "Nilphamari", "Panchagarh", "Rangpur", "Thakurgaon"],
+    "Mymensingh": ["Jamalpur", "Mymensingh", "Netrokona", "Sherpur"],
+    "Barishal": ["Barguna", "Barishal", "Bhola", "Jhalokathi", "Patuakhali", "Pirojpur"]
+  };
+
   const gadgetSubcategories = [
     ["Charger", "🔌"], ["Cable & Adapter", "🔗"], ["Powerbank", "🔋"],
     ["Earbuds", "🎧"], ["Neckband", "🎶"], ["Headphones", "🎧"],
@@ -59,6 +71,50 @@
   ];
 
   let cart = JSON.parse(localStorage.getItem("fgbd_cart") || "[]");
+  let backendOnline = false;
+  let liveProductsLoaded = false;
+  const selectedVariants = {};
+
+  async function apiRequest(path, options = {}) {
+    const base = (CFG.apiBaseUrl || "").replace(/\/$/, "");
+    if (!base) throw new Error("API base URL is not configured.");
+    const response = await fetch(base + path, {
+      ...options,
+      headers: { "Content-Type": "application/json", ...(options.headers || {}) }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.ok === false) throw new Error(data.error || "Request failed.");
+    return data;
+  }
+
+  function normalizeLiveProducts(rows) {
+    return (rows || []).map(p => {
+      const variants = Array.isArray(p.variants) ? p.variants : [];
+      const v = variants[0] || { sku: "", variantId: "", variant: "", price: 0, oldPrice: 0, stock: "Out of Stock", image: "", images: [] };
+      return {
+        id: p.id, name: p.name, brand: p.brand, category: p.category, subcategory: p.subcategory,
+        price: Number(v.price || 0), oldPrice: Number(v.oldPrice || 0), stock: v.stock || "Out of Stock",
+        image: v.image || "", images: v.images || [], description: p.description || p.shortDescription || "",
+        shortDescription: p.shortDescription || "", variant: v.variant || "", sku: v.sku || "",
+        variantId: v.variantId || v.sku || "", variants, featured: !!p.featured, newArrival: !!p.newArrival, deal: !!p.deal
+      };
+    });
+  }
+
+  async function loadProductsFromApi() {
+    if (CFG.useMockData && !CFG.tryLiveData) return;
+    try {
+      const data = await apiRequest("/products");
+      if (data.products && data.products.length) {
+        products = normalizeLiveProducts(data.products);
+        backendOnline = true;
+        liveProductsLoaded = true;
+        render();
+      }
+    } catch (error) {
+      backendOnline = false;
+    }
+  }
   let currentSearch = "";
   let currentCategory = "All";
 
@@ -147,7 +203,7 @@
             <strong>${money(p.price)}</strong>
             ${p.oldPrice ? `<del>${money(p.oldPrice)}</del>` : ""}
           </div>
-          <button class="quick-add" ${disabled} onclick="addToCart('${p.id}')">${disabled ? "Out of Stock" : "+ Add to Cart"}</button>
+          <button class="quick-add" ${disabled} onclick="addToCart('${p.id}', '${escapeHtml(p.sku || "")}')">${disabled ? "Out of Stock" : "+ Add to Cart"}</button>
         </div>
       </article>`;
   }
@@ -240,27 +296,37 @@
 
   function productPage(id) {
     const p = products.find(x => x.id === id) || products[0];
+    if (!p) return `${header()}<main class="page"><div class="empty">Product not found.</div></main>${footer()}${bottomNav()}`;
+    const variants = Array.isArray(p.variants) && p.variants.length ? p.variants : [{ sku: p.sku || "", variantId: p.variantId || p.sku || "", variant: p.variant || "", price: p.price, oldPrice: p.oldPrice, stock: p.stock, image: p.image, images: p.images || [] }];
+    const selectedSku = selectedVariants[p.id] || variants[0].sku;
+    const selected = variants.find(v => v.sku === selectedSku) || variants[0];
+    const display = {...p, price: Number(selected.price || 0), oldPrice: Number(selected.oldPrice || 0), stock: selected.stock, image: selected.image || p.image, sku: selected.sku, variant: selected.variant, variantId: selected.variantId};
     return `
       ${header()}
       <main class="page">
         <a class="back" href="#shop">← Back to Shop</a>
         <div class="product-detail">
-          <div class="detail-media">${productImage(p, true)}</div>
+          <div class="detail-media">${productImage(display, true)}</div>
           <div class="detail-info">
-            <span class="eyebrow">${escapeHtml(p.category)}</span>
-            <h1>${escapeHtml(p.name)}</h1>
-            <p class="muted">${escapeHtml(p.brand)} · SKU ${escapeHtml(p.id)}</p>
-            <div class="detail-price"><strong>${money(p.price)}</strong>${p.oldPrice?`<del>${money(p.oldPrice)}</del>`:""}</div>
-            <span class="${stockClass(p.stock)}">${escapeHtml(p.stock)}</span>
-            <p>${escapeHtml(p.description)}</p>
-            <div class="variant"><b>Variant</b><button>${escapeHtml(p.variant)}</button></div>
-            <div class="buy-row"><div class="qty"><button onclick="changeTempQty(-1)">−</button><span id="tempQty">1</span><button onclick="changeTempQty(1)">+</button></div><button class="btn primary grow" ${p.stock==="Out of Stock"?"disabled":""} onclick="addToCart('${p.id}')">Add to Cart</button></div>
-            <button class="btn outline full" ${p.stock==="Out of Stock"?"disabled":""} onclick="buyNow('${p.id}')">Buy Now</button>
+            <span class="eyebrow">${escapeHtml(display.category)}</span>
+            <h1>${escapeHtml(display.name)}</h1>
+            <p class="muted">${escapeHtml(display.brand)} · SKU ${escapeHtml(display.sku || display.id)}</p>
+            <div class="detail-price"><strong>${money(display.price)}</strong>${display.oldPrice?`<del>${money(display.oldPrice)}</del>`:""}</div>
+            <span class="${stockClass(display.stock)}">${escapeHtml(display.stock)}</span>
+            <p>${escapeHtml(display.description)}</p>
+            <div class="variant"><b>Variant</b><div class="chips variant-chips">${variants.map(v => `<button class="${v.sku===selectedSku?"active":""}" onclick="selectVariant('${escapeHtml(p.id)}','${escapeHtml(v.sku)}')">${escapeHtml(v.variant || v.sku || "Standard")}</button>`).join("")}</div></div>
+            <div class="buy-row"><div class="qty"><button onclick="changeTempQty(-1)">−</button><span id="tempQty">1</span><button onclick="changeTempQty(1)">+</button></div><button class="btn primary grow" ${display.stock==="Out of Stock"?"disabled":""} onclick="addToCart('${escapeHtml(display.id)}','${escapeHtml(display.sku || "")}')">Add to Cart</button></div>
+            <button class="btn outline full" ${display.stock==="Out of Stock"?"disabled":""} onclick="buyNow('${escapeHtml(display.id)}','${escapeHtml(display.sku || "")}')">Buy Now</button>
             <div class="mini-trust"><span>🛡️ Authentic</span><span>🚚 Fast Delivery</span><span>↻ Easy Return</span></div>
           </div>
         </div>
         <section class="section"><div class="section-head"><div><span class="eyebrow">COMPLETE YOUR SETUP</span><h2>Frequently Bought Together</h2></div></div><div class="product-grid">${products.filter(x=>x.id!==p.id).slice(0,3).map(productCard).join("")}</div></section>
       </main>${footer()}${bottomNav()}`;
+  }
+
+  function selectVariant(productId, sku) {
+    selectedVariants[productId] = sku;
+    render();
   }
 
   let tempQty = 1;
@@ -276,7 +342,7 @@
       <main class="page narrow"><section class="page-head"><span class="eyebrow">YOUR CART</span><h1>Ready when you are.</h1></section>
       ${cart.length ? `<div class="cart-list">${cart.map(item => `
         <div class="cart-item"><div class="cart-thumb">${productImage(item)}</div><div class="cart-main"><b>${escapeHtml(item.name)}</b><small>${escapeHtml(item.variant||"")}</small><span class="${stockClass(item.stock)}">${escapeHtml(item.stock)}</span><strong>${money(item.price)}</strong></div>
-        <div class="qty"><button onclick="changeCart('${item.id}',-1)">−</button><span>${item.qty}</span><button onclick="changeCart('${item.id}',1)">+</button></div><button class="remove" onclick="removeCart('${item.id}')">×</button></div>`).join("")}</div>
+        <div class="qty"><button onclick="changeCart('${escapeHtml(item.cartKey || item.id)}',-1)">−</button><span>${item.qty}</span><button onclick="changeCart('${escapeHtml(item.cartKey || item.id)}',1)">+</button></div><button class="remove" onclick="removeCart('${escapeHtml(item.cartKey || item.id)}')">×</button></div>`).join("")}</div>
       <div class="summary"><div><span>Subtotal</span><b>${money(total)}</b></div><div><span>Delivery</span><b>Calculated at checkout</b></div><hr><div class="grand"><span>Total</span><b>${money(total)}</b></div><a class="btn primary full" href="#checkout">Checkout</a><a class="btn outline full" href="#shop">Continue Shopping</a></div>`
       : `<div class="empty"><div class="empty-icon">🛒</div><h2>Your cart is empty</h2><p>Add something you love and come back here.</p><a class="btn primary" href="#shop">Start Shopping</a></div>`}
       </main>${footer()}${bottomNav()}`;
@@ -291,21 +357,23 @@
         <label data-field="phone">Mobile Number *<div class="phone-field"><span>+88</span><input id="phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="11" placeholder="01XXXXXXXXX" aria-describedby="phone-help"></div><small id="phone-help" class="field-hint">Enter exactly 11 digits starting with 01.</small></label>
         <label data-field="email">Email <small>(Optional)</small><input id="email" type="email" autocomplete="email" placeholder="you@example.com"></label>
         <h2>Delivery Information</h2>
-        <div class="two"><label data-field="division">Division *<select id="division"><option value="">Select Division</option><option>Chattogram</option><option>Dhaka</option><option>Rajshahi</option><option>Khulna</option><option>Barishal</option><option>Sylhet</option><option>Rangpur</option><option>Mymensingh</option></select></label><label data-field="district">District *<select id="district"><option value="">Select District</option><option>Chattogram</option><option>Dhaka</option><option>Cox's Bazar</option><option>Other</option></select></label></div>
-        <label data-field="area">Area / Thana *<input id="area" placeholder="Area / Thana"></label>
+        <div class="two">
+          <label data-field="division">Division *<select id="division" onchange="handleCheckoutInput(event)"><option value="">Select Division</option>${Object.keys(bangladeshDistricts).map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join("")}</select></label>
+          <label data-field="district">District *<select id="district" onchange="handleCheckoutInput(event)" disabled><option value="">Select Division First</option></select></label>
+        </div>
         <label data-field="address">Full Delivery Address *<textarea id="address" placeholder="House/Flat, Road, Area, Landmark"></textarea></label>
         <label data-field="note">Delivery Note <small>(Optional)</small><textarea id="note" placeholder="Any special instructions..."></textarea></label>
         <h2>Payment Method</h2>
         <div class="payment-options">
           ${["Cash on Delivery","bKash","Nagad","Upay","Bank Transfer"].map((x,i)=>`<label class="payment"><input type="radio" name="payment" value="${x}" ${i===0?"checked":""}><span>${["💵","🩷","🟠","🔵","🏦"][i]}</span><b>${x}</b><small>${i===0?"Pay when you receive the product":`Pay securely using ${x}`}</small></label>`).join("")}
         </div>
-        <div class="delivery-note-card"><b>🚚 Delivery</b><span>Inside Chattogram City: ${money(60)} · Outside Chattogram City: ${money(120)}</span><span class="free-delivery-progress" id="freeDeliveryMessage">Free delivery eligibility is checked automatically.</span></div>
-        <div class="summary checkout-summary"><div><span>Subtotal</span><b>${money(total)}</b></div><div><span>Delivery</span><b id="deliveryAmount">Calculated after address</b></div><hr><div class="grand"><span>Total</span><b id="checkoutGrandTotal">${money(total)}</b></div><button id="placeOrderBtn" class="btn primary full order-submit" type="button" disabled onclick="placeDemoOrder()">Place Order</button><small class="legal">All required fields must be completed correctly. By placing your order, you agree to our Terms & Conditions and Privacy Policy.</small></div>
+        <div class="delivery-note-card"><b>🚚 Delivery</b><span>Chattogram District: ${money(60)} · Other Districts: ${money(120)}</span><span class="free-delivery-progress" id="freeDeliveryMessage">Free delivery eligibility is checked automatically.</span></div>
+        <div class="summary checkout-summary"><div><span>Subtotal</span><b>${money(total)}</b></div><div><span>Delivery</span><b id="deliveryAmount">Calculated after address</b></div><hr><div class="grand"><span>Total</span><b id="checkoutGrandTotal">${money(total)}</b></div><button id="placeOrderBtn" class="btn primary full order-submit" type="button" disabled onclick="placeOrder()">Place Order</button><small class="legal">All required fields must be completed correctly. By placing your order, you agree to our Terms & Conditions and Privacy Policy.</small></div>
       </section></main>${footer()}${bottomNav()}`;
   }
 
   function confirmationPage() {
-    return `${header()}<main class="page narrow"><div class="success-card"><div class="success-icon">✓</div><span class="eyebrow">THANK YOU</span><h1>Order Confirmed!</h1><p>Your order has been received. We’ll contact you shortly to confirm delivery details.</p><b>Order ID: <span id="demoOrderId">FG-10258</span></b><strong class="confirm-total">${money(window.demoTotal||0)}</strong><a class="btn primary full" href="#track">Track Your Order</a><a class="btn outline full" href="#home">Back to Home</a></div></main>${footer()}${bottomNav()}`;
+    return `${header()}<main class="page narrow"><div class="success-card"><div class="success-icon">✓</div><span class="eyebrow">THANK YOU</span><h1>Order Confirmed!</h1><p>Your order has been received. We’ll contact you shortly to confirm delivery details.</p><b>Order ID: <span id="demoOrderId">${escapeHtml(window.demoOrderId || "—")}</span></b><strong class="confirm-total">${money(window.demoTotal||0)}</strong><a class="btn primary full" href="#track">Track Your Order</a><a class="btn outline full" href="#home">Back to Home</a></div></main>${footer()}${bottomNav()}`;
   }
 
   function trackPage() {
@@ -341,24 +409,28 @@
     return `<footer><div class="footer-brand"><img src="${logo}" alt="Flash Gear BD"><div><b>FLASH GEAR BD</b><span>Mobile & Accessories Store</span></div></div><div class="footer-grid"><div><b>Shop</b><a href="#shop">All Products</a><a href="#offers">Offers</a><a href="#track">Track Order</a></div><div><b>Help</b><a href="#support">Support</a><a href="#faq">FAQ</a><a href="tel:+8801601093553">+8801601093553</a></div><div><b>Visit</b><span>Meridian Kohinoor City Level 5, 537 No. Shop</span><span>11 AM – 9 PM</span><span>Chattogram, Bangladesh</span></div></div><div class="footer-payment"><b>Payment:</b> Cash on Delivery · bKash · Nagad · Upay · Bank Transfer</div><small>© ${new Date().getFullYear()} Flash Gear BD. All rights reserved.</small></footer>`;
   }
 
-  function addToCart(id) {
+  function addToCart(id, sku = "") {
     const p = products.find(x => x.id === id);
-    if (!p || p.stock === "Out of Stock") return;
-    const existing = cart.find(x => x.id === id);
+    if (!p) return;
+    const variants = Array.isArray(p.variants) && p.variants.length ? p.variants : [{ sku: p.sku || "", variantId: p.variantId || p.sku || "", variant: p.variant || "", price: p.price, oldPrice: p.oldPrice, stock: p.stock, image: p.image, images: p.images || [] }];
+    const v = variants.find(x => x.sku === sku) || variants[0];
+    if (!v || v.stock === "Out of Stock") return;
+    const key = `${id}::${v.sku || "default"}`;
+    const existing = cart.find(x => x.cartKey === key);
     if (existing) existing.qty += 1;
-    else cart.push({...p, qty: 1});
+    else cart.push({...p, price: Number(v.price || 0), oldPrice: Number(v.oldPrice || 0), stock: v.stock, image: v.image || p.image, variant: v.variant || p.variant, sku: v.sku || p.sku || "", variantId: v.variantId || v.sku || p.variantId || "", cartKey: key, qty: 1});
     saveCart();
     toast("Added to cart ✓");
   }
 
-  function buyNow(id) { addToCart(id); location.hash = "#checkout"; }
+  function buyNow(id, sku = "") { addToCart(id, sku); location.hash = "#checkout"; }
   function changeCart(id, delta) {
-    const item = cart.find(x => x.id === id); if (!item) return;
+    const item = cart.find(x => (x.cartKey || x.id) === id); if (!item) return;
     item.qty += delta;
-    if (item.qty <= 0) cart = cart.filter(x => x.id !== id);
+    if (item.qty <= 0) cart = cart.filter(x => (x.cartKey || x.id) !== id);
     saveCart(); render();
   }
-  function removeCart(id) { cart = cart.filter(x => x.id !== id); saveCart(); render(); }
+  function removeCart(id) { cart = cart.filter(x => (x.cartKey || x.id) !== id); saveCart(); render(); }
 
   function setSearch(v) { currentSearch = v; }
 
@@ -371,7 +443,7 @@
   function setCategory(v) { currentCategory = v; render(); }
   function toggleMenu() { document.getElementById("main-menu")?.classList.toggle("open"); }
 
-  const requiredCheckoutFields = ["name", "phone", "division", "district", "area", "address"];
+  const requiredCheckoutFields = ["name", "phone", "division", "district", "address"];
 
   function phoneIsValid() {
     const digits = (document.getElementById("phone")?.value || "").replace(/\D/g, "");
@@ -393,8 +465,20 @@
     el.setAttribute("aria-invalid", invalid ? "true" : "false");
   }
 
+  function syncDistrictOptions() {
+    const division = document.getElementById("division");
+    const district = document.getElementById("district");
+    if (!division || !district) return;
+    const selected = district.value;
+    const list = bangladeshDistricts[division.value] || [];
+    district.innerHTML = `<option value="">${list.length ? "Select District" : "Select Division First"}</option>` + list.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join("");
+    district.disabled = !list.length;
+    if (list.includes(selected)) district.value = selected;
+  }
+
   function handleCheckoutInput(event) {
     const target = event?.target;
+    if (target?.id === "division") syncDistrictOptions();
     if (target?.id && requiredCheckoutFields.includes(target.id)) {
       const hasValue = String(target.value || "").trim().length > 0;
       markCheckoutField(target.id, hasValue && !getCheckoutFieldValid(target.id));
@@ -436,7 +520,7 @@
     return valid;
   }
 
-  function placeDemoOrder() {
+  async function placeOrder() {
     if (!validateCheckout()) {
       const firstInvalid = requiredCheckoutFields.find(id => !getCheckoutFieldValid(id));
       if (firstInvalid) {
@@ -446,15 +530,70 @@
       toast("Please complete the highlighted required field.");
       return;
     }
-    window.demoTotal = cart.reduce((s, item) => s + item.price * item.qty, 0);
-    window.demoPhone = "+88" + document.getElementById("phone").value.trim();
-    cart = []; saveCart(); location.hash = "#confirmed";
+    if (!cart.length) { toast("Your cart is empty."); return; }
+
+    const btn = document.getElementById("placeOrderBtn");
+    if (btn) { btn.disabled = true; btn.classList.add("is-disabled"); btn.textContent = "Placing Order…"; }
+
+    const phone = document.getElementById("phone").value.trim();
+    const payload = {
+      name: document.getElementById("name").value.trim(),
+      phone,
+      email: document.getElementById("email").value.trim(),
+      division: document.getElementById("division").value,
+      district: document.getElementById("district").value,
+      address: document.getElementById("address").value.trim(),
+      note: document.getElementById("note").value.trim(),
+      payment: document.querySelector('input[name="payment"]:checked')?.value || "Cash on Delivery",
+      idempotencyKey: (crypto.randomUUID ? crypto.randomUUID() : `fg-${Date.now()}-${Math.random().toString(16).slice(2)}`),
+      items: cart.map(item => ({ productId: item.id, sku: item.sku || "", qty: Number(item.qty) }))
+    };
+
+    try {
+      if (backendOnline || !CFG.useMockData) {
+        const data = await apiRequest("/createOrder", { method: "POST", body: JSON.stringify(payload) });
+        window.demoOrderId = data.orderId;
+        window.demoTotal = Number(data.total || 0);
+        window.demoPhone = "+88" + phone;
+        cart = []; saveCart();
+        location.hash = "#confirmed";
+        return;
+      }
+      if (CFG.allowDemoOrders) {
+        window.demoOrderId = "DEMO-" + Date.now().toString().slice(-6);
+        window.demoTotal = cart.reduce((s, item) => s + item.price * item.qty, 0);
+        window.demoPhone = "+88" + phone;
+        cart = []; saveCart(); location.hash = "#confirmed";
+        return;
+      }
+      throw new Error("Order system is not connected yet. Please try again shortly.");
+    } catch (error) {
+      toast(error.message || "Unable to place the order. Please try again.");
+      if (btn) { btn.disabled = false; btn.classList.remove("is-disabled"); btn.textContent = "Place Order"; }
+    }
   }
 
-  function showDemoTracking() {
-    const el = document.getElementById("tracking-result");
-    if (!el) return;
-    el.innerHTML = `<div class="tracking-card"><div class="tracking-top"><b>FG-10258</b><span class="stock in">Confirmed</span></div><div class="timeline"><div class="done">●<span>Order Placed<small>Received successfully</small></span></div><div class="done">●<span>Confirmed<small>Order confirmed</small></span></div><div>○<span>Shipped<small>Waiting for update</small></span></div><div>○<span>Delivered<small>Waiting for update</small></span></div></div><div class="tracking-meta"><span>Courier <b>Not assigned yet</b></span><span>Tracking ID <b>—</b></span></div></div>`;
+  async function showDemoTracking() {
+    const result = document.getElementById("tracking-result");
+    const inputs = document.querySelectorAll('.form-card input');
+    const orderId = inputs[0]?.value.trim();
+    const phone = inputs[1]?.value.trim();
+    if (!orderId || !/^01\d{9}$/.test(phone)) { toast("Enter a valid Order ID and 11-digit phone number."); return; }
+    if (!result) return;
+
+    try {
+      if (backendOnline || !CFG.useMockData) {
+        const data = await apiRequest(`/trackOrder?orderId=${encodeURIComponent(orderId)}&phone=${encodeURIComponent(phone)}`);
+        if (!data.order) throw new Error(data.error || "Order not found.");
+        const o = data.order;
+        result.innerHTML = `<div class="tracking-card"><div class="tracking-top"><b>${escapeHtml(o.orderId)}</b><span class="stock in">${escapeHtml(o.status)}</span></div><div class="timeline">${o.timeline.map(t => `<div class="${t.done ? "done" : ""}">${t.done ? "●" : "○"}<span>${escapeHtml(t.status)}<small>${t.done ? "Completed" : "Waiting for update"}</small></span></div>`).join("")}</div><div class="tracking-meta"><span>Total <b>${money(o.total)}</b></span><span>Payment <b>${escapeHtml(o.payment)}</b></span><span>Courier <b>${escapeHtml(o.courier || "Not assigned yet")}</b></span><span>Tracking ID <b>${escapeHtml(o.trackingId || "—")}</b></span></div></div>`;
+        return;
+      }
+    } catch (error) {
+      result.innerHTML = `<div class="empty"><h3>Order not found</h3><p>${escapeHtml(error.message || "Please check your Order ID and phone number.")}</p></div>`;
+      return;
+    }
+    result.innerHTML = `<div class="tracking-card"><div class="tracking-top"><b>${escapeHtml(orderId)}</b><span class="stock in">Confirmed</span></div><div class="timeline"><div class="done">●<span>Order Placed<small>Received successfully</small></span></div><div class="done">●<span>Confirmed<small>Order confirmed</small></span></div><div>○<span>Shipped<small>Waiting for update</small></span></div><div>○<span>Delivered<small>Waiting for update</small></span></div></div><div class="tracking-meta"><span>Courier <b>Not assigned yet</b></span><span>Tracking ID <b>—</b></span></div></div>`;
   }
 
   function toast(msg) {
@@ -503,7 +642,8 @@
   window.setCategory = setCategory;
   window.toggleMenu = toggleMenu;
   window.changeTempQty = changeTempQty;
-  window.placeDemoOrder = placeDemoOrder;
+  window.placeOrder = placeOrder;
+  window.selectVariant = selectVariant;
   window.showDemoTracking = showDemoTracking;
   window.handleCheckoutInput = handleCheckoutInput;
   window.validateCheckout = validateCheckout;
@@ -511,4 +651,5 @@
 
   window.addEventListener("hashchange", render);
   render();
+  loadProductsFromApi();
 })();

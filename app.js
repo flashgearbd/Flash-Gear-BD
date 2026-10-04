@@ -2,7 +2,7 @@
   "use strict";
 
   const CFG = window.FLASH_GEAR_CONFIG || {};
-  const logo = "assets/flash-gear-logo.png";
+  const logo = "./flash-gear-logo.png";
 
   const products = [
     {
@@ -100,9 +100,15 @@
             <a href="#track">Track Order</a>
             <a href="#support">Support</a>
           </nav>
+          <div class="header-search">
+            <form class="header-search-form" onsubmit="submitHeaderSearch(event)">
+              <button class="header-search-icon" type="button" aria-label="Search">⌕</button>
+              <input id="headerSearch" value="${escapeHtml(currentSearch)}" autocomplete="off" placeholder="Search products..." aria-label="Search products">
+              <button class="header-search-submit" type="submit" aria-label="Search">⌕</button>
+            </form>
+          </div>
           <div class="header-actions">
-            <button class="icon-btn" onclick="location.hash='#search'" aria-label="Search">⌕</button>
-            <button class="cart-btn" onclick="location.hash='#cart'">🛒<span data-cart-count>0</span></button>
+            <button class="cart-btn" onclick="location.hash='#cart'" aria-label="Cart">🛒<span data-cart-count>0</span></button>
           </div>
         </div>
       </header>`;
@@ -113,7 +119,6 @@
       <nav class="bottom-nav">
         <a href="#home">⌂<small>Home</small></a>
         <a href="#shop">▦<small>Categories</small></a>
-        <a href="#search">⌕<small>Search</small></a>
         <a href="#cart">🛒<small>Cart</small><b data-cart-count>0</b></a>
         <a href="#account">◉<small>Account</small></a>
       </nav>`;
@@ -343,6 +348,13 @@
   function removeCart(id) { cart = cart.filter(x => x.id !== id); saveCart(); render(); }
 
   function setSearch(v) { currentSearch = v; }
+
+  function submitHeaderSearch(event) {
+    event.preventDefault();
+    const input = document.getElementById("headerSearch");
+    currentSearch = (input?.value || "").trim();
+    location.hash = "#search";
+  }
   function setCategory(v) { currentCategory = v; render(); }
   function toggleMenu() { document.getElementById("main-menu")?.classList.toggle("open"); }
 
@@ -369,25 +381,32 @@
   function render() {
     const hash = location.hash.replace(/^#/, "") || "home";
     const [path, query] = hash.split("?");
-    if (path === "home") document.getElementById("app").innerHTML = homePage();
+    let html = "";
+    if (path === "home") html = homePage();
     else if (path === "shop") {
       const params = new URLSearchParams(query || "");
       if (params.get("category")) currentCategory = params.get("category");
-      document.getElementById("app").innerHTML = shopPage();
+      html = shopPage();
     }
-    else if (path.startsWith("product/")) document.getElementById("app").innerHTML = productPage(path.split("/")[1]);
-    else if (path === "cart") document.getElementById("app").innerHTML = cartPage();
-    else if (path === "checkout") document.getElementById("app").innerHTML = checkoutPage();
-    else if (path === "confirmed") document.getElementById("app").innerHTML = confirmationPage();
-    else if (path === "track") document.getElementById("app").innerHTML = trackPage();
-    else if (path === "search") document.getElementById("app").innerHTML = searchPage();
-    else if (path === "account") document.getElementById("app").innerHTML = accountPage();
-    else if (path === "support") document.getElementById("app").innerHTML = supportPage();
-    else if (path === "faq") document.getElementById("app").innerHTML = faqPage();
-    else if (path === "offers") document.getElementById("app").innerHTML = shopPage();
-    else document.getElementById("app").innerHTML = homePage();
+    else if (path.startsWith("product/")) html = productPage(path.split("/")[1]);
+    else if (path === "cart") html = cartPage();
+    else if (path === "checkout") html = checkoutPage();
+    else if (path === "confirmed") html = confirmationPage();
+    else if (path === "track") html = trackPage();
+    else if (path === "search") html = searchPage();
+    else if (path === "account") html = accountPage();
+    else if (path === "support") html = supportPage();
+    else if (path === "faq") html = faqPage();
+    else if (path === "offers") html = shopPage();
+    else html = homePage();
+
+    const app = document.getElementById("app");
+    app.classList.remove("page-enter");
+    app.innerHTML = html;
+    void app.offsetWidth;
+    app.classList.add("page-enter");
     updateCartCount();
-    window.scrollTo({top:0, behavior:"instant"});
+    window.scrollTo({top:0, behavior:"auto"});
   }
 
   window.addToCart = addToCart;
@@ -395,6 +414,7 @@
   window.changeCart = changeCart;
   window.removeCart = removeCart;
   window.setSearch = setSearch;
+  window.submitHeaderSearch = submitHeaderSearch;
   window.setCategory = setCategory;
   window.toggleMenu = toggleMenu;
   window.changeTempQty = changeTempQty;

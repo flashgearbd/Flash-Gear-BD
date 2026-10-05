@@ -1,13 +1,12 @@
 /**
  * FLASH GEAR BD — Cloudflare Worker API Gateway
- * FGBD V1.0.16
+ * FGBD V1.0.18
  *
- * Secrets to configure in Cloudflare:
- *   APPS_SCRIPT_URL = your deployed Google Apps Script Web App URL
- *   FGBD_API_KEY    = the same secret saved in Apps Script Script Properties
+ * Website -> Cloudflare Worker -> Google Apps Script -> Google Sheets
  *
- * Static files are served through the ASSETS binding.
- * API paths are configured with run_worker_first so /api requests reach this Worker before asset fallback.
+ * Cloudflare secrets:
+ *   APPS_SCRIPT_URL = deployed Google Apps Script Web App URL
+ *   FGBD_API_KEY    = same secret stored in Apps Script Script Properties
  */
 
 const corsHeaders = {
@@ -24,16 +23,10 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // Support both /api?action=... and /api/... styles.
-    // The website currently uses /api?action=..., while /api/... remains
-    // supported for direct REST-style calls.
     if (url.pathname === '/api' || url.pathname === '/api/' || url.pathname.startsWith('/api/')) {
       return handleApi(request, env, url);
     }
 
-    // Private admin application. Serve admin.html directly from the Assets binding.
-    // IMPORTANT: do not redirect /admin -> /admin.html. A direct asset fetch avoids
-    // redirect loops while keeping /admin, /admin/ and /admin.html all functional.
     if (url.pathname === '/admin' || url.pathname === '/admin/' || url.pathname === '/admin.html') {
       const adminUrl = new URL('/admin.html', url);
       const adminRequest = new Request(adminUrl.toString(), {
@@ -63,45 +56,72 @@ async function handleApi(request, env, url) {
         if (key !== 'action') target.searchParams.set(key, value);
       });
       target.searchParams.set('apiKey', env.FGBD_API_KEY);
-      const upstream = await fetch(target.toString(), { redirect: 'follow' });
-      return proxyResponse(upstream);
+      const upstream = await fetch(target.toString(), {
+        method: 'GET',
+        redirect: 'follow',
+        headers: { 'Accept': 'application/json' }
+      });
+      return await proxyResponse(upstream, action);
     }
 
     if (request.method === 'POST') {
-      const body = await request.json();
+      const raw = await request.text();
+      let body = {};
+      try {
+        body = raw ? JSON.parse(raw) : {};
+      } catch (_) {
+        return json({ ok: false, error: 'Invalid JSON request body.' }, 400);
+      }
       body.apiKey = env.FGBD_API_KEY;
       body.action = body.action || action;
 
       const upstream = await fetch(target.toString(), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify(body),
         redirect: 'follow'
       });
-      return proxyResponse(upstream);
+      return await proxyResponse(upstream, action);
     }
 
     return json({ ok: false, error: 'Method not allowed.' }, 405);
   } catch (error) {
-    return json({ ok: false, error: 'Backend request failed.', detail: error.message }, 502);
+    return json({
+      ok: false,
+      error: 'Backend request failed.',
+      detail: String(error && error.message || error)
+    }, 502);
   }
 }
 
-async function proxyResponse(upstream) {
+async function proxyResponse(upstream, action) {
   const text = await upstream.text();
-  return new Response(text, {
-    status: upstream.status,
-    headers: {
-      'Content-Type': upstream.headers.get('Content-Type') || 'application/json',
-      ...corsHeaders,
-      'Cache-Control': 'no-store'
-    }
-  });
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (_) {
+    const snippet = text.replace(/\s+/g, ' ').trim().slice(0, 280);
+    return json({
+      ok: false,
+      error: `Backend returned an invalid response for ${action}.`,
+      detail: snippet || `HTTP ${upstream.status}`,
+      upstreamStatus: upstream.status
+    }, 502);
+  }
+
+  return json(data, upstream.status);
 }
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      ...corsHeaders,
+      'Cache-Control': 'no-store, no-cache, must-revalidate'
+    }
   });
 }

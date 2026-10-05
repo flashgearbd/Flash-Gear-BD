@@ -174,8 +174,9 @@
           <div class="header-search">
             <form class="header-search-form" onsubmit="submitHeaderSearch(event)">
               <span class="header-search-icon" aria-hidden="true">⌕</span>
-              <input id="headerSearch" value="${escapeHtml(currentSearch)}" autocomplete="off" list="productSuggestions" placeholder="Search products..." aria-label="Search products"><datalist id="productSuggestions">${products.slice(0,30).map(p=>`<option value="${escapeHtml(p.name)}"></option>`).join("")}</datalist>
+              <input id="headerSearch" value="${escapeHtml(currentSearch)}" autocomplete="off" placeholder="Search products..." aria-label="Search products" oninput="handleHeaderSearchInput(this.value)" onfocus="handleHeaderSearchInput(this.value)" onblur="setTimeout(hideHeaderSuggestions,160)">
               <button class="header-search-submit" type="submit" aria-label="Search">⌕</button>
+              <div id="headerSearchSuggestions" class="header-search-suggestions" role="listbox" aria-label="Product suggestions"></div>
             </form>
           </div>
           <div class="header-actions">
@@ -456,13 +457,86 @@
   }
   function removeCart(id) { cart = cart.filter(x => (x.cartKey || x.id) !== id); saveCart(); render(); }
 
-  function setSearch(v) { currentSearch = v; }
+  function setSearch(v) { currentSearch = String(v || ""); }
+
+  function searchMatchScore(p, query) {
+    const q = String(query || "").trim().toLowerCase();
+    if (!q) return 0;
+    const name = String(p.name || "").toLowerCase();
+    const brand = String(p.brand || "").toLowerCase();
+    const category = String(p.category || "").toLowerCase();
+    const subcategory = String(p.subcategory || "").toLowerCase();
+    const sku = String(p.sku || "").toLowerCase();
+    const fields = [name, brand, category, subcategory, sku];
+    if (!fields.some(x => x.includes(q))) return -1;
+    let score = 0;
+    if (name === q) score += 1200;
+    else if (name.startsWith(q)) score += 1000;
+    else if (name.split(/\s+/).some(w => w.startsWith(q))) score += 900;
+    else if (name.includes(q)) score += 760;
+    if (brand === q) score += 700;
+    else if (brand.startsWith(q)) score += 620;
+    else if (brand.includes(q)) score += 540;
+    if (category.startsWith(q) || subcategory.startsWith(q)) score += 400;
+    else if (category.includes(q) || subcategory.includes(q)) score += 300;
+    if (sku.startsWith(q)) score += 220;
+    else if (sku.includes(q)) score += 160;
+    return score;
+  }
+
+  function getHeaderSuggestions(query) {
+    const q = String(query || "").trim();
+    if (!q || !products.length) return [];
+    return products.map(p => ({ p, score: searchMatchScore(p, q) }))
+      .filter(x => x.score >= 0)
+      .sort((a, b) => b.score - a.score || String(a.p.name).localeCompare(String(b.p.name)))
+      .slice(0, 5)
+      .map(x => x.p);
+  }
+
+  function renderHeaderSuggestions(query) {
+    const box = document.getElementById("headerSearchSuggestions");
+    if (!box) return;
+    const q = String(query || "").trim();
+    const matches = getHeaderSuggestions(q);
+    if (!q) { box.innerHTML = ""; box.classList.remove("show"); return; }
+    if (!matches.length) {
+      box.innerHTML = `<div class="search-suggestion-empty">No matching products</div>`;
+      box.classList.add("show");
+      return;
+    }
+    box.innerHTML = matches.map(p => `
+      <button type="button" class="search-suggestion" onclick="chooseHeaderSuggestion('${escapeHtml(p.id)}')">
+        <span class="search-suggestion-image">${productImage(p)}</span>
+        <span class="search-suggestion-copy"><b>${escapeHtml(p.name)}</b><small>${escapeHtml(p.brand || p.category || "Product")} · ${money(p.price)}</small></span>
+      </button>`).join("");
+    box.classList.add("show");
+  }
+
+  function handleHeaderSearchInput(value) {
+    currentSearch = String(value || "");
+    renderHeaderSuggestions(currentSearch);
+  }
+
+  function hideHeaderSuggestions() {
+    const box = document.getElementById("headerSearchSuggestions");
+    if (box) box.classList.remove("show");
+  }
+
+  function chooseHeaderSuggestion(id) {
+    const p = products.find(x => String(x.id) === String(id));
+    if (!p) return;
+    currentSearch = p.name;
+    hideHeaderSuggestions();
+    location.hash = `#product/${encodeURIComponent(p.id)}`;
+  }
 
   function submitHeaderSearch(event) {
     event.preventDefault();
     const input = document.getElementById("headerSearch");
     currentSearch = (input?.value || "").trim();
-    location.hash = "#search";
+    hideHeaderSuggestions();
+    location.hash = `#search?q=${encodeURIComponent(currentSearch)}`;
   }
   function setCategory(v) { currentCategory = v; render(); }
   function toggleMenu() { document.getElementById("main-menu")?.classList.toggle("open"); }
@@ -663,6 +737,9 @@
   window.removeCart = removeCart;
   window.setSearch = setSearch;
   window.submitHeaderSearch = submitHeaderSearch;
+  window.handleHeaderSearchInput = handleHeaderSearchInput;
+  window.hideHeaderSuggestions = hideHeaderSuggestions;
+  window.chooseHeaderSuggestion = chooseHeaderSuggestion;
   window.setCategory = setCategory;
   window.toggleMenu = toggleMenu;
   window.changeTempQty = changeTempQty;

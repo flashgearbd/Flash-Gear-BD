@@ -1,6 +1,6 @@
 /*
   FLASH GEAR BD — Frontend configuration
-  FGBD V1.0.17
+  FGBD V1.0.18
 
   Production architecture:
     Website -> Cloudflare Worker /api -> Google Apps Script -> Google Sheets
@@ -12,7 +12,7 @@ window.FLASH_GEAR_CONFIG = {
   tagline: "Mobile & Accessories Store",
   currency: "৳",
   apiBaseUrl: "/api",
-  useMockData: true,
+  useMockData: false,
   tryLiveData: true,
   allowDemoOrders: false
 };

@@ -8,12 +8,21 @@
   const imageUrl=u=>{u=String(u||'');const m=u.match(/drive\.google\.com\/(?:uc\?export=view&id=|file\/d\/)([A-Za-z0-9_-]+)/);return m?'https://drive.google.com/thumbnail?id='+encodeURIComponent(m[1])+'&sz=w1600':u};
   function msg(id,text,error=false){const e=$(id);if(!e)return;e.textContent=text||'';e.className='message'+(error?' err':'');}
   async function api(action,body={},method='POST'){
-    if(method==='GET'){
-      const qs=new URLSearchParams({action,...body,sessionToken:state.token});
-      const r=await fetch('/api?'+qs); const j=await r.json(); if(!j.ok&&!j.setupRequired)throw new Error(j.error||'Request failed.'); return j;
+    const options=method==='GET'
+      ? {}
+      : {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,...body,sessionToken:state.token})};
+    const url=method==='GET'
+      ? '/api?'+new URLSearchParams({action,...body,sessionToken:state.token})
+      : '/api';
+    const r=await fetch(url,{...options,cache:'no-store'});
+    const raw=await r.text();
+    let j;
+    try{j=raw?JSON.parse(raw):{};}catch(_){
+      const detail=raw.replace(/\s+/g,' ').trim().slice(0,220);
+      throw new Error(`API returned an invalid response (HTTP ${r.status})${detail?': '+detail:'.'}`);
     }
-    const r=await fetch('/api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,...body,sessionToken:state.token})});
-    const j=await r.json(); if(!j.ok&&!j.setupRequired)throw new Error(j.error||'Request failed.'); return j;
+    if(!r.ok||(!j.ok&&!j.setupRequired))throw new Error(j.error||j.detail||`Request failed (HTTP ${r.status}).`);
+    return j;
   }
   function showAppLoading(text='Loading your admin workspace…'){
     $('loginView').classList.add('hidden');$('appView').classList.remove('hidden');$('adminUser').textContent=state.user||'Admin';

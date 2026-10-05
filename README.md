@@ -1,4 +1,4 @@
-# Flash Gear BD — V1.0.6
+# Flash Gear BD — V1.0.7
 
 ## Cloudflare Worker API routing
 The Worker now supports both API URL formats:
@@ -19,3 +19,7 @@ Do not commit or expose the API key in GitHub.
 The checkout collects Division, District and Full Delivery Address. It does not collect Area/Thana. District choices are dynamically filtered by the selected division using the current Bangladesh National Portal list of 8 divisions and 64 districts.
 
 Current delivery-zone fallback without Area/Thana: Chattogram District = ৳60; all other districts = ৳120.
+
+
+## V1.0.7 API routing fix
+Cloudflare static assets are configured with `run_worker_first` for `/api/*`, ensuring API requests reach the Worker before the single-page application fallback. The Worker continues to support `/api?action=...` and `/api/...` routes.

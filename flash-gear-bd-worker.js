@@ -1,12 +1,13 @@
 /**
  * FLASH GEAR BD — Cloudflare Worker API Gateway
- * FGBD V1.0.6
+ * FGBD V1.0.7
  *
  * Secrets to configure in Cloudflare:
  *   APPS_SCRIPT_URL = your deployed Google Apps Script Web App URL
  *   FGBD_API_KEY    = the same secret saved in Apps Script Script Properties
  *
  * Static files are served through the ASSETS binding.
+ * API paths are configured with run_worker_first so /api requests reach this Worker before asset fallback.
  */
 
 const corsHeaders = {

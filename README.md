@@ -1,4 +1,4 @@
-# FLASH GEAR BD — FGBD V1.0.10
+# FLASH GEAR BD — FGBD V1.0.11
 
 ## What is new
 - Private mobile-first Admin Panel at `/admin`
@@ -50,7 +50,7 @@ The generated initial password is stored only as a hash after setup; it is not k
 All website files are kept in the project root. No `assets` folder is used.
 
 
-## V1.0.10
-- Fixed `/admin`, `/admin/`, and `/admin.html` routing to avoid redirect loops.
-- Admin CSS, JS, and logo now use absolute root paths.
-- API routing remains unchanged.
+## V1.0.11
+- Fixed Cloudflare `run_worker_first` redundancy by removing the duplicate `/admin/` rule.
+- Admin routing now uses `/admin` and `/admin/*`, while `/admin.html` remains available.
+- No API, Apps Script, storefront, or secret changes.

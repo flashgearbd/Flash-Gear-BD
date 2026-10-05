@@ -140,3 +140,47 @@ footer{background:var(--navy);color:white;padding:38px max(18px,calc((100vw - 11
 }
 .subcategory-panel{background:#f2f7ff;border:1px solid #d5e5fb;border-radius:16px;padding:14px;margin-bottom:18px;display:grid;gap:5px}.subcategory-panel>b{font-size:13px}.subcategory-panel>span{font-size:10px;color:var(--muted)}.subchips{padding:7px 0 0}.coming-soon-card{background:white;border:1px solid #d9e5f3;border-radius:22px;padding:42px 24px;text-align:center;display:grid;justify-items:center;gap:10px;box-shadow:var(--shadow);min-height:280px}.coming-soon-icon{width:62px;height:62px;border-radius:18px;background:#eaf3ff;display:grid;place-items:center;font-size:30px}.coming-soon-card h2{max-width:650px;margin:0;font-size:25px}.coming-soon-card p{color:var(--muted);margin:0 0 8px}
 .subcategory-panel{background:#f2f7ff;border:1px solid #d5e5fb;border-radius:16px;padding:14px;margin-bottom:18px;display:grid;gap:5px}.subcategory-panel>b{font-size:13px}.subcategory-panel>span{font-size:10px;color:var(--muted)}.subchips{padding:7px 0 0}.coming-soon-card{background:white;border:1px solid #d9e5f3;border-radius:22px;padding:42px 24px;text-align:center;display:grid;justify-items:center;gap:10px;box-shadow:var(--shadow);min-height:280px}.coming-soon-icon{width:62px;height:62px;border-radius:18px;background:#eaf3ff;display:grid;place-items:center;font-size:30px}.coming-soon-card h2{max-width:650px;margin:0;font-size:25px}.coming-soon-card p{color:var(--muted);margin:0 0 8px}
+
+
+/* FGBD V1.0.17 — clean storefront refinement */
+.category-grid{grid-template-columns:repeat(6,1fr)}
+.category-card{min-height:70px;display:flex;flex-direction:column;justify-content:center;gap:5px;padding:15px 10px;box-shadow:none}
+.category-card span{display:none!important}
+.category-card b{font-size:12px;line-height:1.25}
+.category-card small{font-size:8px;color:var(--blue);font-weight:800}
+.category-card:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(13,35,66,.08)}
+.subcategory-panel{background:transparent;border:0;padding:0;margin-bottom:18px}
+.subcategory-panel>b{font-size:14px}.subcategory-panel>span{font-size:11px}
+.subchips{padding-top:8px}
+.product-media{position:relative;aspect-ratio:1/1;height:auto;min-height:0}
+.product-media img{display:block;width:100%;height:100%;object-fit:contain;padding:10px}
+.product-card{box-shadow:0 2px 10px rgba(13,35,66,.035)}
+.product-card:hover{transform:translateY(-2px)}
+.product-body{min-height:158px;display:flex;flex-direction:column}
+.product-body .quick-add{margin-top:auto}
+.detail-gallery{min-width:0}
+.detail-thumbs{display:flex;gap:8px;overflow:auto;padding:10px 2px 2px}
+.detail-thumb{flex:0 0 58px;width:58px;height:58px;padding:3px;background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.detail-thumb.active{border-color:var(--blue);box-shadow:0 0 0 2px rgba(13,99,255,.12)}
+.detail-thumb img{width:100%;height:100%;object-fit:contain}
+.detail-media{background:#f4f7fb}
+.payment{grid-template-columns:20px 38px 1fr;min-height:64px;background:#fff}
+.payment-icon,.payment-logo-wrap{width:34px;height:34px;display:grid;place-items:center}
+.payment-logo-wrap{border-radius:8px;background:#fff;overflow:hidden}
+.payment-logo-wrap img{max-width:100%;max-height:100%;object-fit:contain}
+.payment-brand>div{display:grid;gap:2px}.payment-brand small{grid-column:auto}
+.payment small{grid-column:3;font-size:10px}
+.payment:has(input:checked){border-color:#9fc2ff;box-shadow:0 0 0 3px rgba(13,99,255,.07)}
+.header-search-form{box-shadow:0 3px 12px rgba(0,0,0,.09)}
+.hero{box-shadow:0 16px 40px rgba(13,35,66,.09)}
+.loading-skeleton{background:linear-gradient(90deg,#edf2f7 25%,#f7f9fb 37%,#edf2f7 63%);background-size:400% 100%;animation:skeleton 1.2s ease infinite}
+@keyframes skeleton{0%{background-position:100% 0}100%{background-position:-100% 0}}
+@media(max-width:900px){
+  .category-grid{grid-template-columns:repeat(3,1fr);gap:7px}
+  .category-card{min-height:62px;padding:12px 7px}
+  .category-card b{font-size:10px}
+  .product-media{aspect-ratio:1/1;height:auto}
+  .product-media img{padding:8px}
+  .detail-media{aspect-ratio:1/1;max-height:min(82vw,360px)}
+  .payment{grid-template-columns:18px 36px 1fr;padding:10px}
+}

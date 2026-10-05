@@ -44,12 +44,12 @@
   ];
 
   const categories = [
-    ["Mobile", "📱", true], ["Feature Phone", "☎️", true],
-    ["Gadget & Accessories", "🎧", false], ["Charger", "🔌", false],
-    ["Cable & Adapter", "🔗", false], ["Powerbank", "🔋", false],
-    ["Earbuds", "🎧", false], ["Neckband", "🎶", false],
-    ["Headphones", "🎧", false], ["Microphone", "🎙️", false],
-    ["Speaker", "🔊", false], ["Smart watch", "⌚", false]
+    ["Mobile", true], ["Feature Phone", true],
+    ["Gadget & Accessories", false], ["Charger", false],
+    ["Cable & Adapter", false], ["Powerbank", false],
+    ["Earbuds", false], ["Neckband", false],
+    ["Headphones", false], ["Microphone", false],
+    ["Speaker", false], ["Smart watch", false]
   ];
 
   // Bangladesh: 8 divisions and 64 districts. District options are filtered by selected division.
@@ -65,9 +65,9 @@
   };
 
   const gadgetSubcategories = [
-    ["Charger", "🔌"], ["Cable & Adapter", "🔗"], ["Powerbank", "🔋"],
-    ["Earbuds", "🎧"], ["Neckband", "🎶"], ["Headphones", "🎧"],
-    ["Microphone", "🎙️"], ["Speaker", "🔊"], ["Smart watch", "⌚"]
+    ["Charger"], ["Cable & Adapter"], ["Powerbank"],
+    ["Earbuds"], ["Neckband"], ["Headphones"],
+    ["Microphone"], ["Speaker"], ["Smart watch"]
   ];
 
   let cart = JSON.parse(localStorage.getItem("fgbd_cart") || "[]");
@@ -143,10 +143,10 @@
   }
 
   function productImage(p, large = false) {
-    if (p.image) return `<img src="${escapeHtml(normalizeImageUrl(p.image))}" loading="lazy" decoding="async" alt="${escapeHtml(p.name)}" onerror="this.style.display='none'">`;
-    return `<div class="product-placeholder ${large ? "large" : ""}">
-      <span>⚡</span><small>${escapeHtml(p.category)}</small>
-    </div>`;
+    const src = normalizeImageUrl(p.image || (p.images || [])[0] || "");
+    const fallback = `<div class="product-placeholder ${large ? "large" : ""}"><span>⚡</span><small>${escapeHtml(p.category || "Product")}</small></div>`;
+    if (!src) return fallback;
+    return `<img src="${escapeHtml(src)}" loading="lazy" decoding="async" alt="${escapeHtml(p.name)}" onerror="this.outerHTML='${fallback.replace(/'/g,"\'")}'">`;
   }
 
   function escapeHtml(v) {
@@ -174,7 +174,7 @@
           <div class="header-search">
             <form class="header-search-form" onsubmit="submitHeaderSearch(event)">
               <span class="header-search-icon" aria-hidden="true">⌕</span>
-              <input id="headerSearch" value="${escapeHtml(currentSearch)}" autocomplete="off" placeholder="Search products..." aria-label="Search products">
+              <input id="headerSearch" value="${escapeHtml(currentSearch)}" autocomplete="off" list="productSuggestions" placeholder="Search products..." aria-label="Search products"><datalist id="productSuggestions">${products.slice(0,30).map(p=>`<option value="${escapeHtml(p.name)}"></option>`).join("")}</datalist>
               <button class="header-search-submit" type="submit" aria-label="Search">⌕</button>
             </form>
           </div>
@@ -242,10 +242,10 @@
 
         <section class="section">
           <div class="section-head"><div><span class="eyebrow">EXPLORE</span><h2>Shop by Category</h2></div><a href="#shop">View All →</a></div>
-          <div class="category-grid">${categories.map(([name, icon, coming]) =>
+          <div class="category-grid">${categories.map(([name, coming]) =>
             coming
-              ? `<a class="category-card coming" href="#shop?category=${encodeURIComponent(name)}"><span>${icon}</span><b>${name}</b><small>Coming Later</small></a>`
-              : `<a class="category-card" href="#shop?category=${encodeURIComponent(name)}"><span>${icon}</span><b>${name}</b></a>`
+              ? `<a class="category-card coming" href="#shop?category=${encodeURIComponent(name)}"><b>${name}</b><small>Coming Later</small></a>`
+              : `<a class="category-card" href="#shop?category=${encodeURIComponent(name)}"><b>${name}</b></a>`
           ).join("")}</div>
         </section>
 
@@ -253,6 +253,10 @@
           <div class="section-head"><div><span class="eyebrow">CURATED FOR YOU</span><h2>Featured Products</h2></div><a href="#shop">View All →</a></div>
           <div class="product-grid">${featured.map(productCard).join("")}</div>
         </section>
+
+        ${products.some(p=>p.deal || p.oldPrice) ? `<section class="section"><div class="section-head"><div><span class="eyebrow">BEST VALUE</span><h2>Deals</h2></div><a href="#shop">Shop Deals →</a></div><div class="product-grid">${products.filter(p=>p.deal || p.oldPrice).slice(0,4).map(productCard).join("")}</div></section>` : ""}
+
+        ${products.some(p=>p.newArrival) ? `<section class="section soft"><div class="section-head"><div><span class="eyebrow">JUST IN</span><h2>New Arrivals</h2></div><a href="#shop">View All →</a></div><div class="product-grid">${products.filter(p=>p.newArrival).slice(0,4).map(productCard).join("")}</div></section>` : ""}
 
         <section class="promo">
           <div><span class="eyebrow">FLASH GEAR PROMISE</span><h2>Simple shopping.<br>Clear information.</h2><p>See product availability as In Stock, Low Stock or Out of Stock. No confusing quantity displays.</p></div>
@@ -286,9 +290,9 @@
         <div class="searchbar"><input id="shopSearch" value="${escapeHtml(currentSearch)}" placeholder="Search products..." oninput="setSearch(this.value)"><button>⌕</button></div>
         <div class="chips">
           <button class="${currentCategory==="All"?"active":""}" onclick="setCategory('All')">All</button>
-          ${categories.map(([name,,coming]) => `<button class="${currentCategory===name?"active":""}" onclick="setCategory('${name.replace(/'/g,"\'")}')">${name}${coming ? " · Coming Later" : ""}</button>`).join("")}
+          ${categories.map(([name,coming]) => `<button class="${currentCategory===name?"active":""}" onclick="setCategory('${name.replace(/'/g,"\'")}')">${name}${coming ? " · Coming Later" : ""}</button>`).join("")}
         </div>
-        ${showGadgetSubcategories ? `<div class="subcategory-panel"><b>Gadget & Accessories</b><span>Choose a category</span><div class="chips subchips">${gadgetSubcategories.map(([name,icon])=>`<button onclick="setCategory('${name.replace(/'/g,"\'")}')">${icon} ${name}</button>`).join("")}</div></div>` : ""}
+        ${showGadgetSubcategories ? `<div class="subcategory-panel"><b>Gadget & Accessories</b><span>Choose a category</span><div class="chips subchips">${gadgetSubcategories.map(([name])=>`<button onclick="setCategory('${name.replace(/'/g,"\'")}')">${name}</button>`).join("")}</div></div>` : ""}
         ${isComingSoon ? `<div class="coming-soon-card"><div class="coming-soon-icon">⚡</div><span class="eyebrow">COMING LATER</span><h2>We’re currently working on our ${currentCategory.toLowerCase()} inventory.</h2><p>Until then, explore our latest gadgets & accessories.</p><a class="btn primary" href="#shop?category=Gadget%20%26%20Accessories">Explore Gadgets & Accessories</a></div>` : `
         <div class="shop-layout">
           <aside class="filter-panel">
@@ -312,7 +316,10 @@
       <main class="page">
         <a class="back" href="#shop">← Back to Shop</a>
         <div class="product-detail">
-          <div class="detail-media">${productImage(display, true)}</div>
+          <div class="detail-gallery">
+            <div class="detail-media" id="detailMedia">${productImage(display, true)}</div>
+            ${(display.images && display.images.length > 1) ? `<div class="detail-thumbs">${display.images.slice(0,6).map((im,i)=>`<button class="detail-thumb ${normalizeImageUrl(im)===normalizeImageUrl(display.image)?"active":""}" type="button" onclick="selectProductImage('${escapeHtml(normalizeImageUrl(im))}')"><img src="${escapeHtml(normalizeImageUrl(im))}" loading="lazy" alt="${escapeHtml(display.name)} image ${i+1}"></button>`).join("")}</div>` : ""}
+          </div>
           <div class="detail-info">
             <span class="eyebrow">${escapeHtml(display.category)}</span>
             <h1>${escapeHtml(display.name)}</h1>
@@ -328,6 +335,14 @@
         </div>
         <section class="section"><div class="section-head"><div><span class="eyebrow">COMPLETE YOUR SETUP</span><h2>Frequently Bought Together</h2></div></div><div class="product-grid">${products.filter(x=>x.id!==p.id).slice(0,3).map(productCard).join("")}</div></section>
       </main>${footer()}${bottomNav()}`;
+  }
+
+  function selectProductImage(url) {
+    const box=document.getElementById("detailMedia");
+    if(!box) return;
+    const img=box.querySelector("img");
+    if(img){ img.src=url; img.style.display="block"; }
+    document.querySelectorAll(".detail-thumb").forEach(b=>b.classList.toggle("active", b.querySelector("img")?.src===url));
   }
 
   function selectVariant(productId, sku) {
@@ -371,7 +386,10 @@
         <label data-field="note">Delivery Note <small>(Optional)</small><textarea id="note" placeholder="Any special instructions..."></textarea></label>
         <h2>Payment Method</h2>
         <div class="payment-options">
-          ${["Cash on Delivery","bKash","Nagad","Upay","Bank Transfer"].map((x,i)=>`<label class="payment"><input type="radio" name="payment" value="${x}" ${i===0?"checked":""}><span>${["💵","🩷","🟠","🔵","🏦"][i]}</span><b>${x}</b><small>${i===0?"Pay when you receive the product":`Pay securely using ${x}`}</small></label>`).join("")}
+          <label class="payment"><input type="radio" name="payment" value="Cash on Delivery" checked><span class="payment-icon">💵</span><b>Cash on Delivery</b><small>Pay when you receive the product.</small></label>
+          <label class="payment payment-brand"><input type="radio" name="payment" value="bKash"><span class="payment-logo-wrap"><img src="https://commons.wikimedia.org/wiki/Special:Redirect/file/BKash-Bangla-Logo-01.png" alt="bKash"></span><div><b>bKash</b><small>Personal · +8801601093553</small></div></label>
+          <label class="payment payment-brand"><input type="radio" name="payment" value="Nagad"><span class="payment-logo-wrap"><img src="https://logotyp.us/file/nagad.svg" alt="Nagad"></span><div><b>Nagad</b><small>Personal · +8801601093553</small></div></label>
+          <label class="payment"><input type="radio" name="payment" value="Bank Transfer"><span class="payment-icon">🏦</span><div><b>Bank Transfer</b><small>City Bank · MD ARMAN · A/C 2805166963001</small></div></label>
         </div>
         <div class="delivery-note-card"><b>🚚 Delivery</b><span>Chattogram District: ${money(60)} · Other Districts: ${money(120)}</span><span class="free-delivery-progress" id="freeDeliveryMessage">Free delivery eligibility is checked automatically.</span></div>
         <div class="summary checkout-summary"><div><span>Subtotal</span><b>${money(total)}</b></div><div><span>Delivery</span><b id="deliveryAmount">Calculated after address</b></div><hr><div class="grand"><span>Total</span><b id="checkoutGrandTotal">${money(total)}</b></div><button id="placeOrderBtn" class="btn primary full order-submit" type="button" disabled onclick="placeOrder()">Place Order</button><small class="legal">All required fields must be completed correctly. By placing your order, you agree to our Terms & Conditions and Privacy Policy.</small></div>
@@ -412,7 +430,7 @@
   }
 
   function footer() {
-    return `<footer><div class="footer-brand"><img src="${logo}" alt="Flash Gear BD"><div><b>FLASH GEAR BD</b><span>Mobile & Accessories Store</span></div></div><div class="footer-grid"><div><b>Shop</b><a href="#shop">All Products</a><a href="#offers">Offers</a><a href="#track">Track Order</a></div><div><b>Help</b><a href="#support">Support</a><a href="#faq">FAQ</a><a href="tel:+8801601093553">+8801601093553</a></div><div><b>Visit</b><span>Meridian Kohinoor City Level 5, 537 No. Shop</span><span>11 AM – 9 PM</span><span>Chattogram, Bangladesh</span></div></div><div class="footer-payment"><b>Payment:</b> Cash on Delivery · bKash · Nagad · Upay · Bank Transfer</div><small>© ${new Date().getFullYear()} Flash Gear BD. All rights reserved.</small></footer>`;
+    return `<footer><div class="footer-brand"><img src="${logo}" alt="Flash Gear BD"><div><b>FLASH GEAR BD</b><span>Mobile & Accessories Store</span></div></div><div class="footer-grid"><div><b>Shop</b><a href="#shop">All Products</a><a href="#offers">Offers</a><a href="#track">Track Order</a></div><div><b>Help</b><a href="#support">Support</a><a href="#faq">FAQ</a><a href="tel:+8801601093553">+8801601093553</a></div><div><b>Visit</b><span>Meridian Kohinoor City Level 5, 537 No. Shop</span><span>11 AM – 9 PM</span><span>Chattogram, Bangladesh</span></div></div><div class="footer-payment"><b>Payment:</b> Cash on Delivery · bKash · Nagad · Bank Transfer</div><small>© ${new Date().getFullYear()} Flash Gear BD. All rights reserved.</small></footer>`;
   }
 
   function addToCart(id, sku = "") {

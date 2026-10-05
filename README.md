@@ -1,4 +1,4 @@
-# Flash Gear BD — V1.0.7
+# Flash Gear BD — V1.0.8
 
 ## Cloudflare Worker API routing
 The Worker now supports both API URL formats:
@@ -21,5 +21,8 @@ The checkout collects Division, District and Full Delivery Address. It does not 
 Current delivery-zone fallback without Area/Thana: Chattogram District = ৳60; all other districts = ৳120.
 
 
-## V1.0.7 API routing fix
+## V1.0.8 API routing fix
 Cloudflare static assets are configured with `run_worker_first` for `/api/*`, ensuring API requests reach the Worker before the single-page application fallback. The Worker continues to support `/api?action=...` and `/api/...` routes.
+
+
+V1.0.8 routing fix: Cloudflare Assets run_worker_first explicitly includes both /api and /api/* so query-based API requests such as /api?action=health reach the Worker before SPA fallback.

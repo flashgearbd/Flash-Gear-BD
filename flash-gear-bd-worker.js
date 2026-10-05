@@ -1,6 +1,6 @@
 /**
  * FLASH GEAR BD — Cloudflare Worker API Gateway
- * FGBD V1.0.7
+ * FGBD V1.0.8
  *
  * Secrets to configure in Cloudflare:
  *   APPS_SCRIPT_URL = your deployed Google Apps Script Web App URL

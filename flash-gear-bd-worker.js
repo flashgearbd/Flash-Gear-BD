@@ -1,6 +1,6 @@
 /**
  * FLASH GEAR BD — Cloudflare Worker API Gateway
- * FGBD V1.0.9
+ * FGBD V1.0.10
  *
  * Secrets to configure in Cloudflare:
  *   APPS_SCRIPT_URL = your deployed Google Apps Script Web App URL
@@ -31,10 +31,16 @@ export default {
       return handleApi(request, env, url);
     }
 
-    // Private admin application. The Worker serves the admin UI as a normal asset;
-    // all sensitive operations still go through /api and the Apps Script backend.
-    if (url.pathname === '/admin' || url.pathname === '/admin/') {
-      return env.ASSETS.fetch(new Request(new URL('/admin.html', request.url), request));
+    // Private admin application. Serve admin.html directly from the Assets binding.
+    // IMPORTANT: do not redirect /admin -> /admin.html. A direct asset fetch avoids
+    // redirect loops while keeping /admin, /admin/ and /admin.html all functional.
+    if (url.pathname === '/admin' || url.pathname === '/admin/' || url.pathname === '/admin.html') {
+      const adminUrl = new URL('/admin.html', url);
+      const adminRequest = new Request(adminUrl.toString(), {
+        method: 'GET',
+        headers: request.headers
+      });
+      return env.ASSETS.fetch(adminRequest);
     }
 
     return env.ASSETS.fetch(request);

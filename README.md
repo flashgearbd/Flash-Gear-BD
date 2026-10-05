@@ -1,4 +1,4 @@
-# FLASH GEAR BD — FGBD V1.0.9
+# FLASH GEAR BD — FGBD V1.0.10
 
 ## What is new
 - Private mobile-first Admin Panel at `/admin`
@@ -18,7 +18,7 @@
 
 ## Important: Google Apps Script update
 Replace your current Apps Script code with:
-`Flash_Gear_BD_AppsScript_V1.0.9.gs`
+`Flash_Gear_BD_AppsScript_V1.0.10.gs`
 
 The script keeps your current spreadsheet ID and existing public API behavior. It adds the admin API and `Order_Log` sheet.
 
@@ -48,3 +48,9 @@ The generated initial password is stored only as a hash after setup; it is not k
 
 ## File structure
 All website files are kept in the project root. No `assets` folder is used.
+
+
+## V1.0.10
+- Fixed `/admin`, `/admin/`, and `/admin.html` routing to avoid redirect loops.
+- Admin CSS, JS, and logo now use absolute root paths.
+- API routing remains unchanged.

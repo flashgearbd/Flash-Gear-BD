@@ -1,28 +1,50 @@
-# Flash Gear BD — V1.0.8
+# FLASH GEAR BD — FGBD V1.0.9
 
-## Cloudflare Worker API routing
-The Worker now supports both API URL formats:
-- `/api?action=health`
-- `/api?action=products`
-- `/api/products`
+## What is new
+- Private mobile-first Admin Panel at `/admin`
+- Admin login with password hashing and failed-login lockout
+- Change admin password from the panel
+- Product Manager: add, edit, publish/hide, delete
+- Multi-variant product editing with SKU, price, stock and image URLs
+- Inventory/stock adjustment
+- Order Manager with status management
+- Courier + tracking ID management
+- Order status/activity log in `Order_Log`
+- Customer list
+- Category Manager
+- Store settings manager
+- Dashboard KPIs and stock alerts
+- Existing public storefront/API preserved
 
-The website can keep using `/api?action=...`. API requests are intercepted before the static website SPA fallback and forwarded securely to the Google Apps Script Web App using the Cloudflare secrets `APPS_SCRIPT_URL` and `FGBD_API_KEY`.
+## Important: Google Apps Script update
+Replace your current Apps Script code with:
+`Flash_Gear_BD_AppsScript_V1.0.9.gs`
 
-## Secrets
-Configure these in Cloudflare Worker → Settings → Variables and Secrets → Production:
-- `APPS_SCRIPT_URL` — Google Apps Script Web App `/exec` URL
-- `FGBD_API_KEY` — the same secret stored in Apps Script Script Properties
+The script keeps your current spreadsheet ID and existing public API behavior. It adds the admin API and `Order_Log` sheet.
 
-Do not commit or expose the API key in GitHub.
+After pasting the full script:
+1. Save.
+2. Run `setupStore()` once.
+3. Authorize Google when prompted.
+4. Deploy the Apps Script web app as a new version of the same deployment.
+5. Keep the same Web App URL.
+6. Keep `FGBD_API_KEY` in Script Properties unchanged.
 
-## Bangladesh Delivery Address
-The checkout collects Division, District and Full Delivery Address. It does not collect Area/Thana. District choices are dynamically filtered by the selected division using the current Bangladesh National Portal list of 8 divisions and 64 districts.
+## Cloudflare
+Deploy this package to the same Cloudflare Worker/GitHub project.
+The Worker serves `/admin` as the admin panel and keeps `/api` routed to the Apps Script backend.
+Keep these Cloudflare Production secrets unchanged:
+- `APPS_SCRIPT_URL`
+- `FGBD_API_KEY`
 
-Current delivery-zone fallback without Area/Thana: Chattogram District = ৳60; all other districts = ৳120.
+## First admin login
+The first time you open `/admin`, use username `admin` and any password attempt. The backend will create a one-time initial password and display it on the login screen.
+Save that password, log in, then immediately use **Settings → Change admin password**.
 
+The generated initial password is stored only as a hash after setup; it is not kept in plain text.
 
-## V1.0.8 API routing fix
-Cloudflare static assets are configured with `run_worker_first` for `/api/*`, ensuring API requests reach the Worker before the single-page application fallback. The Worker continues to support `/api?action=...` and `/api/...` routes.
+## Admin URL
+`https://flash-gear-bd.fgbd.workers.dev/admin`
 
-
-V1.0.8 routing fix: Cloudflare Assets run_worker_first explicitly includes both /api and /api/* so query-based API requests such as /api?action=health reach the Worker before SPA fallback.
+## File structure
+All website files are kept in the project root. No `assets` folder is used.

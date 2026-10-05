@@ -1,6 +1,6 @@
 /**
  * FLASH GEAR BD — Cloudflare Worker API Gateway
- * FGBD V1.0.8
+ * FGBD V1.0.9
  *
  * Secrets to configure in Cloudflare:
  *   APPS_SCRIPT_URL = your deployed Google Apps Script Web App URL
@@ -29,6 +29,12 @@ export default {
     // supported for direct REST-style calls.
     if (url.pathname === '/api' || url.pathname === '/api/' || url.pathname.startsWith('/api/')) {
       return handleApi(request, env, url);
+    }
+
+    // Private admin application. The Worker serves the admin UI as a normal asset;
+    // all sensitive operations still go through /api and the Apps Script backend.
+    if (url.pathname === '/admin' || url.pathname === '/admin/') {
+      return env.ASSETS.fetch(new Request(new URL('/admin.html', request.url), request));
     }
 
     return env.ASSETS.fetch(request);

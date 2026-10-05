@@ -10,15 +10,24 @@
     if(method==='GET'){const qs=new URLSearchParams({action,...body,sessionToken:state.token});const r=await fetch('/api?'+qs);return r.json();}
     opt.body=JSON.stringify({action,...body,sessionToken:state.token});const r=await fetch('/api',{...opt});const j=await r.json();if(!j.ok&&!j.setupRequired)throw new Error(j.error||'Request failed.');return j;
   }
+  function showAppLoading(text='Loading your admin workspace…'){
+    $('loginView').classList.add('hidden');$('appView').classList.remove('hidden');$('adminUser').textContent=state.user||'Admin';
+    $('stats').innerHTML='<div class="loading-card">'+esc(text)+'</div>';
+    ['recentOrders','stockAlerts','productList','orderList','customerList','inventoryList','categoryList','activityList'].forEach(id=>{if($(id))$(id).innerHTML='<div class="loading-card">Loading…</div>';});
+  }
   async function login(){
-    const b=$('loginBtn');b.disabled=true;b.textContent='Logging in...';msg('loginMsg','');
+    const b=$('loginBtn');b.disabled=true;b.textContent='Signing in…';msg('loginMsg','');
     try{const r=await api('adminLogin',{username:$('loginUser').value.trim(),password:$('loginPass').value},'POST');
       if(r.setupRequired){msg('loginMsg','First-time password created: '+r.initialPassword+' — save it, then log in again.',false);return;}
-      state.token=r.sessionToken;state.user=r.username;sessionStorage.setItem('fgbd_admin_token',state.token);await boot();
+      state.token=r.sessionToken;state.user=r.username;sessionStorage.setItem('fgbd_admin_token',state.token);
+      showAppLoading();
+      // Authentication is complete at this point. Load the dashboard data separately so the
+      // user is not left staring at the login screen while Google Sheets is warming up.
+      await boot(true);
     }catch(e){msg('loginMsg',e.message,true);}finally{b.disabled=false;b.textContent='Log in';}
   }
-  async function boot(){
-    try{const r=await api('adminData',{},'GET');if(!r.ok)throw new Error(r.error||'Session expired.');state.data=r;state.user=r.username||state.user;$('loginView').classList.add('hidden');$('appView').classList.remove('hidden');$('adminUser').textContent=state.user;renderAll();}
+  async function boot(alreadyVisible=false){
+    try{if(!alreadyVisible)showAppLoading('Restoring your admin session…');const r=await api('adminData',{},'GET');if(!r.ok)throw new Error(r.error||'Session expired.');state.data=r;state.user=r.username||state.user;$('adminUser').textContent=state.user;renderAll();}
     catch(e){sessionStorage.removeItem('fgbd_admin_token');state.token='';$('loginView').classList.remove('hidden');$('appView').classList.add('hidden');msg('loginMsg',e.message,true);}
   }
   function renderAll(){renderDashboard();renderProducts();renderOrders();renderCustomers();renderInventory();renderCategories();renderActivity();renderSettings();}
@@ -37,7 +46,25 @@
   function openProduct(id=''){
     const p=(state.data.products||[]).find(x=>x.id===id)||{id:'',name:'',brand:'',category:'Gadget & Accessories',subcategory:'',shortDescription:'',description:'',featured:false,newArrival:false,deal:false,variants:[{sku:'',variantId:'',variant:'',costPrice:0,sellingPrice:0,oldPrice:0,stock:0,reorderLevel:10,supplier:'',offerPrice:0,websiteStatus:'Published',images:[]} ]};
     $('modalBody').innerHTML=`<h2>${id?'Edit':'Add'} Product</h2><div class="grid"><label>Product ID<input id="p_id" value="${esc(p.id)}" placeholder="Auto"></label><label>Product Name<input id="p_name" value="${esc(p.name)}"></label><label>Brand<input id="p_brand" value="${esc(p.brand)}"></label><label>Category<select id="p_category">${(state.data.categories||[]).map(c=>`<option ${c.name===p.category?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label><label>Subcategory<input id="p_sub" value="${esc(p.subcategory)}"></label><label>Short Description<input id="p_short" value="${esc(p.shortDescription)}"></label></div><label>Description<textarea id="p_desc">${esc(p.description)}</textarea></label><div class="grid"><label class="check"><input id="p_featured" type="checkbox" ${p.featured?'checked':''}> Featured</label><label class="check"><input id="p_new" type="checkbox" ${p.newArrival?'checked':''}> New Arrival</label><label class="check"><input id="p_deal" type="checkbox" ${p.deal?'checked':''}> Deal / Offer</label></div><h3>Variants</h3><div id="variantBox"></div><button class="secondary" id="addVariant">+ Add Variant</button><div class="actions"><button class="primary" id="saveProduct">Save Product</button><button class="secondary" id="cancelProduct">Cancel</button></div><div id="productMsg" class="message"></div>`;
-    let variants=p.variants.length?p.variants:[];const renderVariants=()=>{$('variantBox').innerHTML=variants.map((v,i)=>`<div class="variant-row" data-v="${i}"><input placeholder="SKU" value="${esc(v.sku)}" data-k="sku"><input placeholder="Variant" value="${esc(v.variant)}" data-k="variant"><input placeholder="Sell price" type="number" value="${v.sellingPrice||0}" data-k="sellingPrice"><input placeholder="Stock" type="number" value="${v.stock||0}" data-k="stock"><input placeholder="Offer price" type="number" value="${v.offerPrice||0}" data-k="offerPrice"><button class="danger" data-rm="${i}">×</button><div style="grid-column:1/-1"><input placeholder="Image URL 1" value="${esc((v.images||[])[0]||'')}" data-k="img1"><input placeholder="Image URL 2" value="${esc((v.images||[])[1]||'')}" data-k="img2"></div></div>`).join('')||'<div class="empty">No variants. Add one.</div>';document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{variants.splice(+b.dataset.rm,1);renderVariants()});};renderVariants();
+    let variants=p.variants.length?p.variants:[];
+    async function uploadImage(file, variantIndex){
+      if(!file)return;
+      if(!['image/jpeg','image/png','image/webp','image/gif'].includes(file.type))throw new Error('Choose a JPG, PNG, WEBP or GIF image.');
+      if(file.size>6*1024*1024)throw new Error('Please choose an image under 6 MB.');
+      const reader=new FileReader();
+      const data=await new Promise((resolve,reject)=>{reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=()=>reject(new Error('Could not read image.'));reader.readAsDataURL(file);});
+      const r=await api('adminImageUpload',{fileName:file.name,mimeType:file.type,base64:data});
+      if(!r.ok)throw new Error(r.error||'Image upload failed.');
+      variants[variantIndex].images=[...(variants[variantIndex].images||[]),r.url].slice(0,4);
+      renderVariants();
+    }
+    const renderVariants=()=>{
+      $('variantBox').innerHTML=variants.map((v,i)=>{const imgs=v.images||[];return `<div class="variant-row" data-v="${i}"><input placeholder="SKU" value="${esc(v.sku)}" data-k="sku"><input placeholder="Variant" value="${esc(v.variant)}" data-k="variant"><input placeholder="Sell price" type="number" value="${v.sellingPrice||0}" data-k="sellingPrice"><input placeholder="Stock" type="number" value="${v.stock||0}" data-k="stock"><input placeholder="Offer price" type="number" value="${v.offerPrice||0}" data-k="offerPrice"><button class="danger" data-rm="${i}">×</button><div class="image-upload-area" style="grid-column:1/-1"><div class="image-previews">${imgs.map((u,j)=>`<div class="image-preview"><img src="${esc(u)}" alt="Product image"><button type="button" class="image-remove" data-img-rm="${i}" data-img-index="${j}">×</button></div>`).join('')}<button type="button" class="upload-tile" data-upload="${i}"><span>＋</span><small>Add photo</small></button></div><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple style="display:none" data-file="${i}"><div class="upload-hint">Choose photos directly from your phone gallery. Up to 4 images.</div></div></div>`}).join('')||'<div class="empty">No variants. Add one.</div>';
+      document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{variants.splice(+b.dataset.rm,1);renderVariants()});
+      document.querySelectorAll('[data-upload]').forEach(b=>b.onclick=()=>$(document.querySelector(`[data-file="${b.dataset.upload}"]`)).click());
+      document.querySelectorAll('[data-file]').forEach(input=>input.onchange=async()=>{try{for(const f of [...input.files].slice(0,4-(variants[+input.dataset.file].images||[]).length)){await uploadImage(f,+input.dataset.file)}msg('productMsg','Image uploaded.');}catch(e){msg('productMsg',e.message,true)}input.value='';});
+      document.querySelectorAll('[data-img-rm]').forEach(b=>b.onclick=()=>{const vi=+b.dataset.imgRm,ii=+b.dataset.imgIndex;variants[vi].images.splice(ii,1);renderVariants()});
+    };renderVariants();
     $('addVariant').onclick=()=>{variants.push({sku:'',variant:'',sellingPrice:0,stock:0,offerPrice:0,images:[]});renderVariants()};
     $('saveProduct').onclick=async()=>{try{const rows=[...document.querySelectorAll('.variant-row')];const out=rows.map((row,i)=>{const v={...variants[i]};row.querySelectorAll('[data-k]').forEach(x=>{const k=x.dataset.k;v[k]=x.type==='number'?Number(x.value):x.value});v.images=[v.img1||'',v.img2||'',v.img3||'',v.img4||''].filter(Boolean);delete v.img1;delete v.img2;return v});if(!out.length)throw new Error('Add at least one variant.');const r=await api('adminProductSave',{product:{id:$('p_id').value.trim(),name:$('p_name').value.trim(),brand:$('p_brand').value.trim(),category:$('p_category').value,subcategory:$('p_sub').value.trim(),shortDescription:$('p_short').value.trim(),description:$('p_desc').value,featured:$('p_featured').checked,newArrival:$('p_new').checked,deal:$('p_deal').checked,variants:out}});if(!r.ok)throw new Error(r.error||'Save failed.');closeModal();await reload();}catch(e){msg('productMsg',e.message,true)}};
     $('cancelProduct').onclick=closeModal;$('modal').classList.remove('hidden');

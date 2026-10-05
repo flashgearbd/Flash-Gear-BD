@@ -1,4 +1,4 @@
-# FLASH GEAR BD — FGBD V1.0.11
+# FLASH GEAR BD — FGBD V1.0.12
 
 ## What is new
 - Private mobile-first Admin Panel at `/admin`
@@ -18,7 +18,7 @@
 
 ## Important: Google Apps Script update
 Replace your current Apps Script code with:
-`Flash_Gear_BD_AppsScript_V1.0.10.gs`
+`Flash_Gear_BD_AppsScript_V1.0.12.gs`
 
 The script keeps your current spreadsheet ID and existing public API behavior. It adds the admin API and `Order_Log` sheet.
 
@@ -50,7 +50,16 @@ The generated initial password is stored only as a hash after setup; it is not k
 All website files are kept in the project root. No `assets` folder is used.
 
 
-## V1.0.11
+## V1.0.12
 - Fixed Cloudflare `run_worker_first` redundancy by removing the duplicate `/admin/` rule.
 - Admin routing now uses `/admin` and `/admin/*`, while `/admin.html` remains available.
 - No API, Apps Script, storefront, or secret changes.
+
+
+## V1.0.12 changes
+- Admin login now reveals the admin workspace immediately after authentication while data loads, instead of keeping the login screen waiting for the full Google Sheets payload.
+- Product images can be selected directly from the phone gallery.
+- Up to 4 images per variant can be uploaded through the Admin Panel.
+- Uploaded product images are stored in a Google Drive folder named `Flash Gear BD Product Images`, with the resulting view URL saved to the product image fields.
+- The first image is used as the main product image.
+- On first image upload, Apps Script may ask for Google Drive authorization; authorize the Apps Script project once.

@@ -5,6 +5,7 @@
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const money=n=>'৳'+Number(n||0).toLocaleString('en-BD');
   const pct=n=>Number(n||0).toFixed(1)+'%';
+  const imageUrl=u=>{u=String(u||'');const m=u.match(/drive\.google\.com\/(?:uc\?export=view&id=|file\/d\/)([A-Za-z0-9_-]+)/);return m?'https://drive.google.com/thumbnail?id='+encodeURIComponent(m[1])+'&sz=w1600':u};
   function msg(id,text,error=false){const e=$(id);if(!e)return;e.textContent=text||'';e.className='message'+(error?' err':'');}
   async function api(action,body={},method='POST'){
     if(method==='GET'){
@@ -41,7 +42,7 @@
   function renderProducts(){
     const q=($('productSearch')?.value||'').toLowerCase(),sf=$('productStatusFilter')?.value||'';let ps=state.data.products||[];
     ps=ps.filter(p=>{const text=[p.id,p.name,p.brand,p.category,p.subcategory,...(p.variants||[]).flatMap(v=>[v.sku,v.variant])].join(' ').toLowerCase();return !q||text.includes(q)}).filter(p=>!sf||(p.variants||[]).some(v=>v.websiteStatus===sf));
-    $('productList').innerHTML=ps.map(p=>{const v=(p.variants||[])[0]||{},img=(v.images||[])[0]||'',profit=Number(v.sellingPrice||0)-Number(v.costPrice||0);return `<div class="list-card"><div class="product-row"><img class="product-img" src="${esc(img)}" onerror="this.style.visibility='hidden'"><div class="list-main"><strong>${esc(p.name)}</strong><span class="muted">${esc(p.id)} · ${esc(p.brand)} · ${esc(p.category)}</span><div><span class="tag">${p.variants.length} variant${p.variants.length===1?'':'s'}</span> <span class="tag ${v.availableStock<=0?'bad':v.availableStock<=v.reorderLevel?'warn':'ok'}">${v.availableStock<=0?'Out of Stock':v.availableStock<=v.reorderLevel?'Low Stock':'In Stock'}</span> <span class="tag">Profit ${money(profit)}</span></div></div></div><div class="actions"><button class="secondary" data-edit="${esc(p.id)}">Edit</button><button class="secondary" data-copy="${esc(p.id)}">Duplicate</button><button class="secondary" data-toggle="${esc(p.id)}">${v.websiteStatus==='Published'?'Hide':'Publish'}</button><button class="danger" data-delete="${esc(p.id)}">Delete</button></div></div>`}).join('')||'<div class="empty">No products found.</div>';
+    $('productList').innerHTML=ps.map(p=>{const v=(p.variants||[])[0]||{},img=(v.images||[])[0]||'',profit=Number(v.sellingPrice||0)-Number(v.costPrice||0);return `<div class="list-card"><div class="product-row"><img class="product-img" src="${esc(imageUrl(img))}" loading="lazy" decoding="async" onerror="this.style.visibility='hidden'"><div class="list-main"><strong>${esc(p.name)}</strong><span class="muted">${esc(p.id)} · ${esc(p.brand)} · ${esc(p.category)}</span><div><span class="tag">${p.variants.length} variant${p.variants.length===1?'':'s'}</span> <span class="tag ${v.availableStock<=0?'bad':v.availableStock<=v.reorderLevel?'warn':'ok'}">${v.availableStock<=0?'Out of Stock':v.availableStock<=v.reorderLevel?'Low Stock':'In Stock'}</span> <span class="tag">Profit ${money(profit)}</span></div></div></div><div class="actions"><button class="secondary" data-edit="${esc(p.id)}">Edit</button><button class="secondary" data-copy="${esc(p.id)}">Duplicate</button><button class="secondary" data-toggle="${esc(p.id)}">${v.websiteStatus==='Published'?'Hide':'Publish'}</button><button class="danger" data-delete="${esc(p.id)}">Delete</button></div></div>`}).join('')||'<div class="empty">No products found.</div>';
     document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openProduct(b.dataset.edit));document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>openProduct(b.dataset.copy,true));document.querySelectorAll('[data-delete]').forEach(b=>b.onclick=()=>deleteProduct(b.dataset.delete));document.querySelectorAll('[data-toggle]').forEach(b=>b.onclick=()=>toggleProduct(b.dataset.toggle));
   }
   function defaultVariant(){return {sku:'',variantId:'',variant:'',costPrice:0,sellingPrice:0,oldPrice:0,stock:0,reorderLevel:10,supplier:'',offerPrice:0,websiteStatus:'Published',images:[]}}
@@ -50,14 +51,53 @@
     if(duplicate){p.id='';p.name=p.name+' Copy';p.variants.forEach(v=>{v.sku='';v.variantId=''});}
     $('modalBody').innerHTML=`<h2>${id&&!duplicate?'Edit':'Add'} Product</h2><div class="grid"><label>Product ID<input id="p_id" value="${esc(p.id)}" placeholder="Auto generated" readonly></label><label>Product Name<input id="p_name" value="${esc(p.name)}" required></label><label>Brand<input id="p_brand" value="${esc(p.brand)}"></label><label>Category<select id="p_category">${(state.data.categories||[]).filter(c=>c.active!==false).sort((a,b)=>a.sortOrder-b.sortOrder).map(c=>`<option ${c.name===p.category?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label><label>Subcategory<input id="p_sub" value="${esc(p.subcategory)}"></label><label>Short Description<input id="p_short" value="${esc(p.shortDescription)}"></label></div><label>Description<textarea id="p_desc">${esc(p.description)}</textarea></label><div class="grid"><label class="check"><input id="p_featured" type="checkbox" ${p.featured?'checked':''}> Featured</label><label class="check"><input id="p_new" type="checkbox" ${p.newArrival?'checked':''}> New Arrival</label><label class="check"><input id="p_deal" type="checkbox" ${p.deal?'checked':''}> Deal / Offer</label></div><h3>Variants</h3><p class="muted">SKU and Variant SKU are automatic. You do not need to type them.</p><div id="variantBox"></div><button class="secondary" id="addVariant">+ Add Variant</button><div class="actions"><button class="primary" id="saveProduct">Save Product</button><button class="secondary" id="cancelProduct">Cancel</button></div><div id="productMsg" class="message"></div>`;
     let variants=p.variants.length?p.variants:[defaultVariant()];
+    function compressImage(file){
+      return new Promise((resolve,reject)=>{
+        if(!/^image\/(jpeg|png|webp|gif)$/.test(file.type))return reject(new Error('Choose JPG, PNG, WEBP or GIF images.'));
+        if(file.size>12*1024*1024)return reject(new Error('Each image must be under 12 MB.'));
+        const reader=new FileReader();
+        reader.onload=()=>{
+          const img=new Image();
+          img.onload=()=>{
+            const max=1600, scale=Math.min(1,max/Math.max(img.naturalWidth||img.width,img.naturalHeight||img.height));
+            const w=Math.max(1,Math.round((img.naturalWidth||img.width)*scale)),h=Math.max(1,Math.round((img.naturalHeight||img.height)*scale));
+            const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+            const ctx=canvas.getContext('2d',{alpha:true});ctx.drawImage(img,0,0,w,h);
+            let mime='image/webp',quality=.82,data=canvas.toDataURL(mime,quality);
+            if(!data.startsWith('data:image/webp')){mime='image/jpeg';quality=.82;data=canvas.toDataURL(mime,quality)}
+            let attempts=0;
+            while(data.length>3.2*1024*1024 && attempts<4){quality-=.12;data=canvas.toDataURL(mime,Math.max(.45,quality));attempts++}
+            const ext=mime==='image/webp'?'webp':'jpg';
+            resolve({fileName:(file.name.replace(/\.[^.]+$/,'')||'product')+'-optimized.'+ext,mimeType:mime,base64:data.split(',')[1],previewUrl:URL.createObjectURL(file)});
+          };
+          img.onerror=()=>reject(new Error('Could not read image.'));img.src=String(reader.result);
+        };
+        reader.onerror=()=>reject(new Error('Could not read image.'));reader.readAsDataURL(file);
+      });
+    }
     async function uploadImages(files,variantIndex){
-      const list=[...files].slice(0,4-(variants[variantIndex].images||[]).length);if(!list.length)return;
-      for(const file of list){if(!['image/jpeg','image/png','image/webp','image/gif'].includes(file.type))throw new Error('Choose JPG, PNG, WEBP or GIF images.');if(file.size>6*1024*1024)throw new Error('Each image must be under 6 MB.');const reader=new FileReader();const data=await new Promise((resolve,reject)=>{reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=()=>reject(new Error('Could not read image.'));reader.readAsDataURL(file)});const r=await api('adminImageUpload',{fileName:file.name,mimeType:file.type,base64:data});variants[variantIndex].images=[...(variants[variantIndex].images||[]),r.url].slice(0,4);renderVariants()}
+      const existing=variants[variantIndex].images||[],list=[...files].slice(0,4-existing.length);if(!list.length)return;
+      const previewItems=list.map(file=>({file,previewUrl:URL.createObjectURL(file)}));
+      variants[variantIndex].images=[...existing,...previewItems.map(x=>x.previewUrl)].slice(0,4);renderVariants();
+      msg('productMsg','Preparing images…');
+      try{
+        const optimized=[];
+        for(let i=0;i<list.length;i++){msg('productMsg','Optimizing image '+(i+1)+' of '+list.length+'…');optimized.push(await compressImage(list[i]));}
+        msg('productMsg','Uploading '+optimized.length+' image'+(optimized.length===1?'':'s')+'…');
+        const r=await api('adminImageBatchUpload',{images:optimized.map(x=>({fileName:x.fileName,mimeType:x.mimeType,base64:x.base64}))});
+        if(!r.ok)throw new Error(r.error||'Image upload failed.');
+        const urls=(r.images||[]).map(x=>imageUrl(x.url));
+        variants[variantIndex].images=[...existing,...urls].slice(0,4);
+        previewItems.forEach(x=>URL.revokeObjectURL(x.previewUrl));
+        renderVariants();msg('productMsg','Images uploaded successfully.');
+      }catch(e){
+        variants[variantIndex].images=existing.slice(0,4);previewItems.forEach(x=>URL.revokeObjectURL(x.previewUrl));renderVariants();throw e;
+      }
     }
     const renderVariants=()=>{
-      $('variantBox').innerHTML=variants.map((v,i)=>{const imgs=v.images||[],profit=Number(v.sellingPrice||0)-Number(v.costPrice||0),margin=Number(v.sellingPrice||0)>0?profit/Number(v.sellingPrice)*100:0;return `<div class="variant-row" data-v="${i}"><div class="variant-head"><b>Variant ${i+1}</b><span class="tag">SKU: ${esc(v.sku||'Auto on save')}</span></div><input placeholder="Variant name (e.g. Black)" value="${esc(v.variant)}" data-k="variant"><input placeholder="Cost price" type="number" value="${v.costPrice||0}" data-k="costPrice"><input placeholder="Selling price" type="number" value="${v.sellingPrice||0}" data-k="sellingPrice"><input placeholder="Old price" type="number" value="${v.oldPrice||0}" data-k="oldPrice"><input placeholder="Stock" type="number" value="${v.stock||0}" data-k="stock"><input placeholder="Reorder level" type="number" value="${v.reorderLevel??10}" data-k="reorderLevel"><input placeholder="Offer price" type="number" value="${v.offerPrice||0}" data-k="offerPrice"><select data-k="websiteStatus"><option ${v.websiteStatus==='Published'?'selected':''}>Published</option><option ${v.websiteStatus==='Hidden'?'selected':''}>Hidden</option><option ${v.websiteStatus==='Draft'?'selected':''}>Draft</option><option ${v.websiteStatus==='Archived'?'selected':''}>Archived</option></select><button class="danger" data-rm="${i}">Remove variant</button><div class="profit-box">Profit: <b>${money(profit)}</b> · Margin: <b>${pct(margin)}</b></div><div class="image-upload-area"><div class="image-previews">${imgs.map((u,j)=>`<div class="image-preview"><img src="${esc(u)}" alt="Product image"><button type="button" class="image-remove" data-img-rm="${i}" data-img-index="${j}">×</button></div>`).join('')}<label class="upload-tile"><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple data-file="${i}"><span>＋</span><small>Add photos</small></label></div><div class="upload-hint">Tap to choose directly from your phone gallery · up to 4 photos</div></div></div>`}).join('');
+      $('variantBox').innerHTML=variants.map((v,i)=>{const imgs=v.images||[],profit=Number(v.sellingPrice||0)-Number(v.costPrice||0),margin=Number(v.sellingPrice||0)>0?profit/Number(v.sellingPrice)*100:0;return `<div class="variant-row" data-v="${i}"><div class="variant-head"><b>Variant ${i+1}</b><span class="tag">SKU: ${esc(v.sku||'Auto on save')}</span></div><input placeholder="Variant name (e.g. Black)" value="${esc(v.variant)}" data-k="variant"><input placeholder="Cost price" type="number" value="${v.costPrice||0}" data-k="costPrice"><input placeholder="Selling price" type="number" value="${v.sellingPrice||0}" data-k="sellingPrice"><input placeholder="Old price" type="number" value="${v.oldPrice||0}" data-k="oldPrice"><input placeholder="Stock" type="number" value="${v.stock||0}" data-k="stock"><input placeholder="Reorder level" type="number" value="${v.reorderLevel??10}" data-k="reorderLevel"><input placeholder="Offer price" type="number" value="${v.offerPrice||0}" data-k="offerPrice"><select data-k="websiteStatus"><option ${v.websiteStatus==='Published'?'selected':''}>Published</option><option ${v.websiteStatus==='Hidden'?'selected':''}>Hidden</option><option ${v.websiteStatus==='Draft'?'selected':''}>Draft</option><option ${v.websiteStatus==='Archived'?'selected':''}>Archived</option></select><button class="danger" data-rm="${i}">Remove variant</button><div class="profit-box">Profit: <b>${money(profit)}</b> · Margin: <b>${pct(margin)}</b></div><div class="image-upload-area"><div class="image-previews">${imgs.map((u,j)=>`<div class="image-preview"><img src="${esc(imageUrl(u))}" loading="lazy" decoding="async" alt="Product image"><button type="button" class="image-remove" data-img-rm="${i}" data-img-index="${j}">×</button></div>`).join('')}<label class="upload-tile"><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple data-file="${i}"><span>＋</span><small>Add photos</small></label></div><div class="upload-hint">Tap to choose directly from your phone gallery · up to 4 photos</div></div></div>`}).join('');
       document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{if(variants.length===1){alert('A product needs at least one variant.');return}variants.splice(+b.dataset.rm,1);renderVariants()});
-      document.querySelectorAll('[data-file]').forEach(input=>input.onchange=async()=>{try{await uploadImages(input.files,+input.dataset.file);msg('productMsg','Image uploaded.')}catch(e){msg('productMsg',e.message,true)}input.value='' });
+      document.querySelectorAll('[data-file]').forEach(input=>input.onchange=async()=>{try{await uploadImages(input.files,+input.dataset.file)}catch(e){msg('productMsg',e.message,true)}input.value='' });
       document.querySelectorAll('[data-img-rm]').forEach(b=>b.onclick=()=>{variants[+b.dataset.imgRm].images.splice(+b.dataset.imgIndex,1);renderVariants()});
     };renderVariants();
     $('addVariant').onclick=()=>{variants.push(defaultVariant());renderVariants()};

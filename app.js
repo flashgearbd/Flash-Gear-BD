@@ -87,6 +87,12 @@
     return data;
   }
 
+  function normalizeImageUrl(url){
+    url=String(url||'');
+    const m=url.match(/drive\.google\.com\/(?:uc\?export=view&id=|file\/d\/)([A-Za-z0-9_-]+)/);
+    return m ? 'https://drive.google.com/thumbnail?id='+encodeURIComponent(m[1])+'&sz=w1600' : url;
+  }
+
   function normalizeLiveProducts(rows) {
     return (rows || []).map(p => {
       const variants = Array.isArray(p.variants) ? p.variants : [];
@@ -94,7 +100,7 @@
       return {
         id: p.id, name: p.name, brand: p.brand, category: p.category, subcategory: p.subcategory,
         price: Number(v.price || 0), oldPrice: Number(v.oldPrice || 0), stock: v.stock || "Out of Stock",
-        image: v.image || "", images: v.images || [], description: p.description || p.shortDescription || "",
+        image: normalizeImageUrl(v.image || ""), images: (v.images || []).map(normalizeImageUrl), description: p.description || p.shortDescription || "",
         shortDescription: p.shortDescription || "", variant: v.variant || "", sku: v.sku || "",
         variantId: v.variantId || v.sku || "", variants, featured: !!p.featured, newArrival: !!p.newArrival, deal: !!p.deal
       };
@@ -137,7 +143,7 @@
   }
 
   function productImage(p, large = false) {
-    if (p.image) return `<img src="${escapeHtml(p.image)}" alt="${escapeHtml(p.name)}">`;
+    if (p.image) return `<img src="${escapeHtml(normalizeImageUrl(p.image))}" loading="lazy" decoding="async" alt="${escapeHtml(p.name)}" onerror="this.style.display='none'">`;
     return `<div class="product-placeholder ${large ? "large" : ""}">
       <span>⚡</span><small>${escapeHtml(p.category)}</small>
     </div>`;
@@ -300,7 +306,7 @@
     const variants = Array.isArray(p.variants) && p.variants.length ? p.variants : [{ sku: p.sku || "", variantId: p.variantId || p.sku || "", variant: p.variant || "", price: p.price, oldPrice: p.oldPrice, stock: p.stock, image: p.image, images: p.images || [] }];
     const selectedSku = selectedVariants[p.id] || variants[0].sku;
     const selected = variants.find(v => v.sku === selectedSku) || variants[0];
-    const display = {...p, price: Number(selected.price || 0), oldPrice: Number(selected.oldPrice || 0), stock: selected.stock, image: selected.image || p.image, sku: selected.sku, variant: selected.variant, variantId: selected.variantId};
+    const display = {...p, price: Number(selected.price || 0), oldPrice: Number(selected.oldPrice || 0), stock: selected.stock, image: normalizeImageUrl(selected.image || p.image), sku: selected.sku, variant: selected.variant, variantId: selected.variantId};
     return `
       ${header()}
       <main class="page">
@@ -418,7 +424,7 @@
     const key = `${id}::${v.sku || "default"}`;
     const existing = cart.find(x => x.cartKey === key);
     if (existing) existing.qty += 1;
-    else cart.push({...p, price: Number(v.price || 0), oldPrice: Number(v.oldPrice || 0), stock: v.stock, image: v.image || p.image, variant: v.variant || p.variant, sku: v.sku || p.sku || "", variantId: v.variantId || v.sku || p.variantId || "", cartKey: key, qty: 1});
+    else cart.push({...p, price: Number(v.price || 0), oldPrice: Number(v.oldPrice || 0), stock: v.stock, image: normalizeImageUrl(v.image || p.image), variant: v.variant || p.variant, sku: v.sku || p.sku || "", variantId: v.variantId || v.sku || p.variantId || "", cartKey: key, qty: 1});
     saveCart();
     toast("Added to cart ✓");
   }

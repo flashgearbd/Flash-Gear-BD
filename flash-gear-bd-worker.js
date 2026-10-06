@@ -1,6 +1,6 @@
 /**
  * FLASH GEAR BD — Cloudflare Worker API Gateway
- * FGBD V1.0.21
+ * FGBD V1.0.22
  *
  * Website -> Cloudflare Worker -> Google Apps Script -> Google Sheets
  *
@@ -104,46 +104,38 @@ function normalizeKey(value) {
   return String(value || '').trim();
 }
 
-async function fetchPreservingMethod(target, init, maxRedirects = 4) {
-  let current = new URL(target.toString());
-  let options = { ...init, redirect: 'manual' };
-
-  for (let attempt = 0; attempt <= maxRedirects; attempt++) {
-    const response = await fetch(current.toString(), options);
-    if (![301, 302, 303, 307, 308].includes(response.status)) return response;
-
-    const location = response.headers.get('Location');
-    if (!location) return response;
-
-    current = new URL(location, current.toString());
-
-    // Google Apps Script ContentService commonly responds to POST with a 302
-    // redirect to a temporary googleusercontent.com URL containing the actual
-    // response body. The POST has already executed, so the redirected request
-    // must be GET. Preserving POST here makes the temporary endpoint return an
-    // HTML/error page instead of the JSON produced by Apps Script.
-    if (response.status === 301 || response.status === 302 || response.status === 303) {
-      options = { method: 'GET', headers: { 'Accept': 'application/json' }, redirect: 'manual' };
-    } else {
-      options = { ...options, redirect: 'manual' };
-    }
-  }
-
-  throw new Error('Too many backend redirects. Check the Apps Script Web App URL.');
+async function fetchPreservingMethod(target, init, maxRedirects = 5) {
+  // Google Apps Script Web Apps commonly return a 302 after executing the
+  // request and place the actual ContentService JSON at the redirect target.
+  // Let the Cloudflare runtime follow that redirect using standard Fetch
+  // semantics. For 301/302/303, Fetch changes POST -> GET after the POST has
+  // already executed, which is exactly what the Apps Script ContentService
+  // response endpoint expects.
+  //
+  // We keep this helper small and use redirect:'follow' rather than manual
+  // redirect handling because Cloudflare may expose cross-origin redirect
+  // responses differently when redirect:'manual' is used.
+  const options = { ...init, redirect: 'follow' };
+  const response = await fetch(target.toString(), options);
+  return response;
 }
 
 async function proxyResponse(upstream, action) {
-  const text = await upstream.text();
+  const contentType = String(upstream.headers.get('content-type') || '');
+  let text = await upstream.text();
+  text = String(text || '').replace(/^\uFEFF/, '').trim();
+
   let data;
   try {
-    data = JSON.parse(text);
+    data = text ? JSON.parse(text) : {};
   } catch (_) {
-    const snippet = text.replace(/\s+/g, ' ').trim().slice(0, 280);
+    const snippet = text.replace(/\s+/g, ' ').trim().slice(0, 500);
     return json({
       ok: false,
       error: `Backend returned an invalid response for ${action}.`,
-      detail: snippet || `HTTP ${upstream.status}`,
-      upstreamStatus: upstream.status
+      detail: snippet || `Empty response. HTTP ${upstream.status}.`,
+      upstreamStatus: upstream.status,
+      upstreamContentType: contentType || 'unknown'
     }, 502);
   }
 
@@ -153,7 +145,8 @@ async function proxyResponse(upstream, action) {
       ok: false,
       error: 'Backend authorization failed.',
       detail: 'Cloudflare reached Google Apps Script, but the API key was rejected. Verify FGBD_API_KEY in both services and redeploy the Apps Script Web App and Worker.',
-      upstreamStatus: upstream.status
+      upstreamStatus: upstream.status,
+      upstreamContentType: contentType || 'unknown'
     }, 401);
   }
 

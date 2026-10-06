@@ -185,7 +185,7 @@ footer{background:var(--navy);color:white;padding:38px max(18px,calc((100vw - 11
   .payment{grid-template-columns:18px 36px 1fr;padding:10px}
 }
 
-/* FGBD V1.0.21 — live search suggestions */
+/* FGBD V1.0.22 — live search suggestions */
 .header-search{position:relative}
 .header-search-suggestions{display:none;position:absolute;z-index:1200;top:calc(100% + 8px);left:0;right:0;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 14px 35px rgba(13,35,66,.16);padding:6px;overflow:hidden}
 .header-search-suggestions.show{display:grid;gap:3px}
@@ -201,7 +201,7 @@ footer{background:var(--navy);color:white;padding:38px max(18px,calc((100vw - 11
 .search-suggestion-empty{padding:14px 12px;color:var(--muted);font-size:11px;text-align:center}
 @media(max-width:700px){.header-search-suggestions{top:calc(100% + 5px);max-height:330px;overflow:auto}.search-suggestion{padding:10px}}
 
-/* FGBD V1.0.21 — image fallback, confirmation, and compact fixed mobile dock */
+/* FGBD V1.0.22 — image fallback, confirmation, and compact fixed mobile dock */
 .product-image-wrap,.product-image-fallback{display:block;width:100%;height:100%}
 .product-image-wrap{position:relative}
 .product-image-wrap>img{display:block;width:100%;height:100%;object-fit:contain}

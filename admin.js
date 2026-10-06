@@ -21,7 +21,7 @@
       const detail=raw.replace(/\s+/g,' ').trim().slice(0,220);
       throw new Error(`API returned an invalid response (HTTP ${r.status})${detail?': '+detail:'.'}`);
     }
-    if(!r.ok||(!j.ok&&!j.setupRequired))throw new Error(j.error||j.detail||`Request failed (HTTP ${r.status}).`);
+    if(!r.ok||(!j.ok&&!j.setupRequired)){const detail=j.detail?`: ${j.detail}`:'';throw new Error((j.error||`Request failed (HTTP ${r.status}).`)+detail);}
     return j;
   }
   function showAppLoading(text='Loading your admin workspace…'){

@@ -4,44 +4,9 @@
   const CFG = window.FLASH_GEAR_CONFIG || {};
   const logo = "./flash-gear-logo.png";
 
-  let products = [
-    {
-      id: "FG-001", name: "20W Fast Charger", brand: "Baseus", category: "Charger",
-      price: 1200, oldPrice: 1450, badge: "Sale", stock: "In Stock",
-      image: "", description: "Compact fast charger for everyday mobile use.",
-      variant: "20W"
-    },
-    {
-      id: "FG-002", name: "Type-C Braided Cable", brand: "Baseus", category: "Cable & Adapter",
-      price: 500, oldPrice: 650, badge: "Popular", stock: "Low Stock",
-      image: "", description: "Durable braided Type-C charging and data cable.",
-      variant: "1m"
-    },
-    {
-      id: "FG-003", name: "Premium Phone Case", brand: "Flash Gear", category: "Gadget & Accessories",
-      price: 850, oldPrice: 999, badge: "New", stock: "In Stock",
-      image: "", description: "Slim protective case with a clean premium finish.",
-      variant: "iPhone 15"
-    },
-    {
-      id: "FG-004", name: "10,000mAh Power Bank", brand: "Anker", category: "Powerbank",
-      price: 2600, oldPrice: 2900, badge: "", stock: "In Stock",
-      image: "", description: "Portable power for your daily travel and work.",
-      variant: "10,000mAh"
-    },
-    {
-      id: "FG-005", name: "Wireless Earbuds", brand: "Xiaomi", category: "Earbuds",
-      price: 2200, oldPrice: 2500, badge: "New", stock: "Low Stock",
-      image: "", description: "Comfortable wireless earbuds for calls and music.",
-      variant: "White"
-    },
-    {
-      id: "FG-006", name: "Smart Watch", brand: "Xiaomi", category: "Smart watch",
-      price: 3900, oldPrice: 4300, badge: "Popular", stock: "Out of Stock",
-      image: "", description: "Everyday smart watch with fitness and notification features.",
-      variant: "Black"
-    }
-  ];
+  // Live catalog only. Products are loaded from Google Sheets through the API.
+  // Keeping this empty prevents stale demo products from hiding backend/catalog problems.
+  let products = [];
 
   const categories = [
     ["Mobile", true], ["Feature Phone", true],
@@ -119,6 +84,9 @@
       }
     } catch (error) {
       backendOnline = false;
+      liveProductsLoaded = false;
+      products = [];
+      render();
     }
   }
   let currentSearch = "";
@@ -144,9 +112,17 @@
 
   function productImage(p, large = false) {
     const src = normalizeImageUrl(p.image || (p.images || [])[0] || "");
-    const fallback = `<div class="product-placeholder ${large ? "large" : ""}"><span>⚡</span><small>${escapeHtml(p.category || "Product")}</small></div>`;
-    if (!src) return fallback;
-    return `<img src="${escapeHtml(src)}" loading="lazy" decoding="async" alt="${escapeHtml(p.name)}" onerror="this.outerHTML='${fallback.replace(/'/g,"\'")}'">`;
+    const fallback = `<span class="product-placeholder ${large ? "large" : ""}" hidden><span>⚡</span><small>${escapeHtml(p.category || "Product")}</small></span>`;
+    if (!src) return `<span class="product-image-fallback">${fallback.replace(' hidden','')}</span>`;
+    return `<span class="product-image-wrap"><img src="${escapeHtml(src)}" loading="lazy" decoding="async" alt="${escapeHtml(p.name)}" onerror="handleImageError(this)">${fallback}</span>`;
+  }
+
+  function handleImageError(img) {
+    if (!img) return;
+    img.onerror = null;
+    img.style.display = "none";
+    const fallback = img.nextElementSibling;
+    if (fallback) fallback.hidden = false;
   }
 
   function escapeHtml(v) {
@@ -280,7 +256,7 @@
     const isComingSoon = currentCategory === "Mobile" || currentCategory === "Feature Phone";
     const showGadgetSubcategories = currentCategory === "Gadget & Accessories";
     const filtered = products.filter(p => {
-      const matchesSearch = !currentSearch || `${p.name} ${p.brand} ${p.category}`.toLowerCase().includes(currentSearch.toLowerCase());
+      const matchesSearch = !currentSearch || `${p.name} ${p.brand} ${p.category} ${p.subcategory || ""} ${p.sku || ""}`.toLowerCase().includes(currentSearch.toLowerCase());
       const matchesCat = currentCategory === "All" || currentCategory === "Gadget & Accessories" || p.category === currentCategory;
       return matchesSearch && matchesCat;
     });
@@ -398,7 +374,10 @@
   }
 
   function confirmationPage() {
-    return `${header()}<main class="page narrow"><div class="success-card"><div class="success-icon">✓</div><span class="eyebrow">THANK YOU</span><h1>Order Confirmed!</h1><p>Your order has been received. We’ll contact you shortly to confirm delivery details.</p><b>Order ID: <span id="demoOrderId">${escapeHtml(window.demoOrderId || "—")}</span></b><strong class="confirm-total">${money(window.demoTotal||0)}</strong><a class="btn primary full" href="#track">Track Your Order</a><a class="btn outline full" href="#home">Back to Home</a></div></main>${footer()}${bottomNav()}`;
+    const subtotal = Number(window.demoSubtotal || 0);
+    const shipping = Number(window.demoShipping || 0);
+    const total = Number(window.demoTotal || 0);
+    return `${header()}<main class="page narrow"><div class="success-card"><div class="success-icon">✓</div><span class="eyebrow">THANK YOU</span><h1>Order Confirmed!</h1><p>Your order has been received. We’ll contact you shortly to confirm delivery details.</p><b>Order ID: <span id="demoOrderId">${escapeHtml(window.demoOrderId || "—")}</span></b><div class="confirmation-breakdown"><span>Subtotal <b>${money(subtotal)}</b></span><span>Delivery <b>${shipping ? money(shipping) : "FREE"}</b></span><strong>Total <b>${money(total)}</b></strong></div><a class="btn primary full" href="#track">Track Your Order</a><a class="btn outline full" href="#home">Back to Home</a></div></main>${footer()}${bottomNav()}`;
   }
 
   function trackPage() {
@@ -408,7 +387,7 @@
   }
 
   function searchPage() {
-    return `${header()}<main class="page"><section class="page-head"><span class="eyebrow">SEARCH</span><h1>What are you looking for?</h1></section><div class="searchbar"><input autofocus placeholder="Search products..." oninput="setSearch(this.value); render()" value="${escapeHtml(currentSearch)}"><button>⌕</button></div><div class="product-grid">${products.filter(p => !currentSearch || `${p.name} ${p.brand} ${p.category}`.toLowerCase().includes(currentSearch.toLowerCase())).map(productCard).join("")}</div></main>${footer()}${bottomNav()}`;
+    return `${header()}<main class="page"><section class="page-head"><span class="eyebrow">SEARCH</span><h1>What are you looking for?</h1></section><div class="searchbar"><input autofocus placeholder="Search products..." oninput="setSearch(this.value); render()" value="${escapeHtml(currentSearch)}"><button>⌕</button></div><div class="product-grid">${products.filter(p => !currentSearch || `${p.name} ${p.brand} ${p.category} ${p.subcategory || ""} ${p.sku || ""}`.toLowerCase().includes(currentSearch.toLowerCase())).map(productCard).join("")}</div></main>${footer()}${bottomNav()}`;
   }
 
   function accountPage() {
@@ -650,8 +629,11 @@
     try {
       if (backendOnline || !CFG.useMockData) {
         const data = await apiRequest("/createOrder", { method: "POST", body: JSON.stringify(payload) });
+        if (!data.orderId) throw new Error(data.error || "Order was not created.");
         window.demoOrderId = data.orderId;
-        window.demoTotal = Number(data.total || 0);
+        window.demoShipping = Number(data.shipping ?? data.delivery ?? 0);
+        window.demoSubtotal = Number(data.subtotal ?? 0);
+        window.demoTotal = Number(data.total ?? (window.demoSubtotal + window.demoShipping));
         window.demoPhone = "+88" + phone;
         cart = []; saveCart();
         location.hash = "#confirmed";
@@ -739,6 +721,7 @@
   window.submitHeaderSearch = submitHeaderSearch;
   window.handleHeaderSearchInput = handleHeaderSearchInput;
   window.hideHeaderSuggestions = hideHeaderSuggestions;
+  window.handleImageError = handleImageError;
   window.chooseHeaderSuggestion = chooseHeaderSuggestion;
   window.setCategory = setCategory;
   window.toggleMenu = toggleMenu;

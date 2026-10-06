@@ -1,6 +1,6 @@
 /**
  * FLASH GEAR BD — Cloudflare Worker API Gateway
- * FGBD V1.0.18
+ * FGBD V1.0.20
  *
  * Website -> Cloudflare Worker -> Google Apps Script -> Google Sheets
  *
@@ -41,24 +41,27 @@ export default {
 };
 
 async function handleApi(request, env, url) {
-  if (!env.APPS_SCRIPT_URL || !env.FGBD_API_KEY) {
+  const apiKey = normalizeKey(env.FGBD_API_KEY);
+  const appsScriptUrl = String(env.APPS_SCRIPT_URL || '').trim();
+  if (!appsScriptUrl || !apiKey) {
     return json({ ok: false, error: 'Backend is not configured yet.' }, 503);
   }
 
-  const pathAction = url.pathname.replace(/^\/api\//, '').replace(/\/$/, '');
+  const pathAction = url.pathname.replace(/^\/api\/?/, '').replace(/\/$/, '');
   const action = url.searchParams.get('action') || pathAction || 'health';
-  const target = new URL(env.APPS_SCRIPT_URL);
+  const target = new URL(appsScriptUrl);
   target.searchParams.set('action', action);
+  // Keep the key in the query string as well as the POST body. This is important
+  // for Google Apps Script web-app redirects, where the body may not survive a redirect.
+  target.searchParams.set('apiKey', apiKey);
 
   try {
     if (request.method === 'GET') {
       url.searchParams.forEach((value, key) => {
         if (key !== 'action') target.searchParams.set(key, value);
       });
-      target.searchParams.set('apiKey', env.FGBD_API_KEY);
-      const upstream = await fetch(target.toString(), {
+      const upstream = await fetchPreservingMethod(target, {
         method: 'GET',
-        redirect: 'follow',
         headers: { 'Accept': 'application/json' }
       });
       return await proxyResponse(upstream, action);
@@ -72,19 +75,19 @@ async function handleApi(request, env, url) {
       } catch (_) {
         return json({ ok: false, error: 'Invalid JSON request body.' }, 400);
       }
-      body.apiKey = env.FGBD_API_KEY;
+      body.apiKey = apiKey;
       body.action = body.action || action;
+      target.searchParams.set('action', body.action);
 
-      const upstream = await fetch(target.toString(), {
+      const upstream = await fetchPreservingMethod(target, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify(body),
-        redirect: 'follow'
+        body: JSON.stringify(body)
       });
-      return await proxyResponse(upstream, action);
+      return await proxyResponse(upstream, body.action);
     }
 
     return json({ ok: false, error: 'Method not allowed.' }, 405);
@@ -95,6 +98,35 @@ async function handleApi(request, env, url) {
       detail: String(error && error.message || error)
     }, 502);
   }
+}
+
+function normalizeKey(value) {
+  return String(value || '').trim();
+}
+
+async function fetchPreservingMethod(target, init, maxRedirects = 4) {
+  let current = new URL(target.toString());
+  let options = { ...init, redirect: 'manual' };
+
+  for (let attempt = 0; attempt <= maxRedirects; attempt++) {
+    const response = await fetch(current.toString(), options);
+    if (![301, 302, 303, 307, 308].includes(response.status)) return response;
+
+    const location = response.headers.get('Location');
+    if (!location) return response;
+
+    current = new URL(location, current.toString());
+
+    // Preserve POST method/body across the Apps Script redirect. A normal
+    // redirect:'follow' can turn a 302 POST into a GET and lose the request body.
+    if (response.status === 303) {
+      options = { method: 'GET', headers: { 'Accept': 'application/json' }, redirect: 'manual' };
+    } else {
+      options = { ...options, redirect: 'manual' };
+    }
+  }
+
+  throw new Error('Too many backend redirects. Check the Apps Script Web App URL.');
 }
 
 async function proxyResponse(upstream, action) {
@@ -110,6 +142,16 @@ async function proxyResponse(upstream, action) {
       detail: snippet || `HTTP ${upstream.status}`,
       upstreamStatus: upstream.status
     }, 502);
+  }
+
+  // Give the browser a useful message when the upstream explicitly rejects auth.
+  if (upstream.status === 401 || String(data.error || '').trim().toLowerCase() === 'unauthorized') {
+    return json({
+      ok: false,
+      error: 'Backend authorization failed.',
+      detail: 'Cloudflare reached Google Apps Script, but the API key was rejected. Verify FGBD_API_KEY in both services and redeploy the Apps Script Web App and Worker.',
+      upstreamStatus: upstream.status
+    }, 401);
   }
 
   return json(data, upstream.status);

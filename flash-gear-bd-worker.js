@@ -1,6 +1,6 @@
 /**
  * FLASH GEAR BD — Cloudflare Worker API Gateway
- * FGBD V1.0.20
+ * FGBD V1.0.21
  *
  * Website -> Cloudflare Worker -> Google Apps Script -> Google Sheets
  *
@@ -117,9 +117,12 @@ async function fetchPreservingMethod(target, init, maxRedirects = 4) {
 
     current = new URL(location, current.toString());
 
-    // Preserve POST method/body across the Apps Script redirect. A normal
-    // redirect:'follow' can turn a 302 POST into a GET and lose the request body.
-    if (response.status === 303) {
+    // Google Apps Script ContentService commonly responds to POST with a 302
+    // redirect to a temporary googleusercontent.com URL containing the actual
+    // response body. The POST has already executed, so the redirected request
+    // must be GET. Preserving POST here makes the temporary endpoint return an
+    // HTML/error page instead of the JSON produced by Apps Script.
+    if (response.status === 301 || response.status === 302 || response.status === 303) {
       options = { method: 'GET', headers: { 'Accept': 'application/json' }, redirect: 'manual' };
     } else {
       options = { ...options, redirect: 'manual' };

@@ -1,4 +1,4 @@
-# Flash Gear BD — FGBD V1.0.20
+# Flash Gear BD — FGBD V1.0.21
 
 Major admin and inventory upgrade for Flash Gear BD.
 
@@ -25,7 +25,7 @@ Major admin and inventory upgrade for Flash Gear BD.
 - No `assets` folder.
 
 ## Important
-1. Replace the deployed Apps Script code with the full `Flash_Gear_BD_AppsScript_V1.0.20.gs` file.
+1. Replace the deployed Apps Script code with the full `Flash_Gear_BD_AppsScript_V1.0.21.gs` file.
 2. Run `setupStore()` once in Apps Script after updating the code. This adds any missing headers and initializes default categories without deleting existing data.
 3. Deploy the Apps Script web app as a new version using the same web-app URL/access settings.
 4. Replace the website/admin files in GitHub with this package and deploy through Cloudflare.
@@ -39,18 +39,18 @@ Major admin and inventory upgrade for Flash Gear BD.
 SKU is an internal inventory code and does not need to be typed by the admin.
 
 
-## V1.0.20 compatibility fix
+## V1.0.21 compatibility fix
 - Fixed the Apps Script parse error caused by the `??=` operator.
 - Dashboard order grouping now uses Google Apps Script-compatible syntax.
 - No database reset is required.
 
 
-V1.0.20 image improvements: client-side image compression, batched Drive upload, Drive thumbnail URLs, lazy loading, immediate local previews, and image fallback normalization.
+V1.0.21 image improvements: client-side image compression, batched Drive upload, Drive thumbnail URLs, lazy loading, immediate local previews, and image fallback normalization.
 
 
-V1.0.20 customer website refresh: clean text-only categories, improved product gallery/image handling, bKash/Nagad branded payment options, Upay removed, improved search suggestions, cleaner mobile storefront and performance-oriented image loading.
+V1.0.21 customer website refresh: clean text-only categories, improved product gallery/image handling, bKash/Nagad branded payment options, Upay removed, improved search suggestions, cleaner mobile storefront and performance-oriented image loading.
 
-## FGBD V1.0.20 fixes
+## FGBD V1.0.21 fixes
 - Production catalog now uses the live Google Sheets API and does not silently fall back to demo products.
 - Cloudflare API gateway normalizes invalid upstream responses into readable JSON errors.
 - Admin API client now reports the actual backend/API error instead of a raw JSON.parse error.
@@ -58,7 +58,7 @@ V1.0.20 customer website refresh: clean text-only categories, improved product g
 - Matching checks product name, brand, category, subcategory and SKU. Example: `an` can match `Anker`; `anti` will not match `Anker` because `anti` is not present in the product text.
 
 
-## V1.0.20 fixes
+## V1.0.21 fixes
 - Live catalog only; stale demo products are not used.
 - Product image fallback no longer exposes broken HTML text.
 - Shipping calculation uses an explicit `shipping` value and returns both `shipping` and `delivery`.
@@ -67,6 +67,6 @@ V1.0.20 customer website refresh: clean text-only categories, improved product g
 - Search suggestions remain live and rank up to 5 matching products while typing.
 
 
-## V1.0.20 authentication fix
+## V1.0.21 authentication fix
 
 The Cloudflare Worker now preserves POST requests across Google Apps Script Web App redirects, sends the API key in both the query string and POST body, trims key whitespace, and returns a specific authorization diagnostic. The Apps Script API key comparison also trims both values and reports whether the key is missing or mismatched.

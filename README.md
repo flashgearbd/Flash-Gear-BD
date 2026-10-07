@@ -1,6 +1,6 @@
-# Flash Gear BD — FGBD V1.0.22
+# Flash Gear BD — FGBD V1.0.23
 
-## V1.0.22 authentication/redirect fix
+## V1.0.23 authentication/redirect fix
 
 This version keeps all V1.0.21 website/admin/inventory fixes and targets the remaining `Backend returned an invalid response for adminLogin` problem.
 
@@ -25,7 +25,7 @@ This version keeps all V1.0.21 website/admin/inventory fixes and targets the rem
 
 ## Deployment
 
-1. Replace the Apps Script project code with the full `Flash_Gear_BD_AppsScript_V1.0.22.gs` file.
+1. Replace the Apps Script project code with the full `Flash_Gear_BD_AppsScript_V1.0.23.gs` file.
 2. In Apps Script, run `setupStore()` once if required. It preserves existing data and creates missing headers/categories.
 3. Deploy the Apps Script as a new Web App version using the same Web App URL/access settings.
 4. Deploy the Cloudflare Worker/site from this package to the production `main` branch.
@@ -38,3 +38,10 @@ This version keeps all V1.0.21 website/admin/inventory fixes and targets the rem
 ## Important
 
 Do not put Google credentials or API secrets into GitHub. The `.gs` file is the application source/reference; Cloudflare secrets and Apps Script Script Properties hold the sensitive API key.
+
+### V1.0.23 admin login transport fix
+- The browser continues to send `adminLogin` as a POST to Cloudflare.
+- Cloudflare converts only `adminLogin` into an HTTPS GET to the Apps Script `doGet` endpoint.
+- Apps Script now handles `action=adminLogin` in `doGet` and returns the normal JSON response.
+- This avoids the Google Apps Script POST ContentService HTML wrapper that was reaching Cloudflare.
+- All other POST actions remain POST.

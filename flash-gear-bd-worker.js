@@ -1,6 +1,6 @@
 /**
  * FLASH GEAR BD — Cloudflare Worker API Gateway
- * FGBD V1.0.22
+ * FGBD V1.0.23
  *
  * Website -> Cloudflare Worker -> Google Apps Script -> Google Sheets
  *
@@ -78,6 +78,25 @@ async function handleApi(request, env, url) {
       body.apiKey = apiKey;
       body.action = body.action || action;
       target.searchParams.set('action', body.action);
+
+      // Google Apps Script Web Apps can return an HTML Google wrapper for a
+      // POST response when the request crosses the script.google.com ->
+      // googleusercontent.com boundary. Admin login is the one request that
+      // must be able to return a clean JSON response before a session exists.
+      // For that request only, send the credentials from this Worker to the
+      // Apps Script doGet endpoint. The browser still sends its credentials
+      // to Cloudflare using POST, so credentials are never exposed in the
+      // website URL. The Worker-to-Google hop remains HTTPS.
+      if (String(body.action) === 'adminLogin') {
+        target.searchParams.set('username', String(body.username || ''));
+        target.searchParams.set('password', String(body.password || ''));
+        const upstream = await fetch(target.toString(), {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+          redirect: 'follow'
+        });
+        return await proxyResponse(upstream, body.action);
+      }
 
       const upstream = await fetchPreservingMethod(target, {
         method: 'POST',

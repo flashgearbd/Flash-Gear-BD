@@ -133,31 +133,44 @@
 
   function header() {
     return `
+      <div class="announcement-bar">
+        <div class="announcement-inner">
+          <span>🚚 Fast Delivery Across Bangladesh</span>
+          <i></i><span>💳 Cash on Delivery Available</span>
+          <i></i><span>✦ 100% Original Products</span>
+          <div class="announcement-links"><a href="#track">Track Order</a><a href="#support">Help</a></div>
+        </div>
+      </div>
       <header class="topbar">
         <div class="topbar-inner">
           <button class="icon-btn mobile-menu" onclick="toggleMenu()" aria-label="Menu">☰</button>
-          <a class="brand" href="#home">
+          <a class="brand" href="#home" onclick="closeMenu()">
             <img src="${logo}" alt="Flash Gear BD">
-            <span><b>FLASH GEAR BD</b><small>Mobile & Accessories</small></span>
+            <span><b>FLASH GEAR BD</b><small>Your Gadget Partner</small></span>
           </a>
-          <nav id="main-menu">
-            <a href="#home">Home</a>
-            <a href="#shop">Shop</a>
-            <a href="#offers">Offers</a>
-            <a href="#track">Track Order</a>
-            <a href="#support">Support</a>
-          </nav>
           <div class="header-search">
             <form class="header-search-form" onsubmit="submitHeaderSearch(event)">
               <span class="header-search-icon" aria-hidden="true">⌕</span>
-              <input id="headerSearch" value="${escapeHtml(currentSearch)}" autocomplete="off" placeholder="Search products..." aria-label="Search products" oninput="handleHeaderSearchInput(this.value)" onfocus="handleHeaderSearchInput(this.value)" onblur="setTimeout(hideHeaderSuggestions,160)">
+              <input id="headerSearch" value="${escapeHtml(currentSearch)}" autocomplete="off" placeholder="Search for products, brands and more..." aria-label="Search products" oninput="handleHeaderSearchInput(this.value)" onfocus="handleHeaderSearchInput(this.value)" onblur="setTimeout(hideHeaderSuggestions,160)">
               <button class="header-search-submit" type="submit" aria-label="Search">⌕</button>
               <div id="headerSearchSuggestions" class="header-search-suggestions" role="listbox" aria-label="Product suggestions"></div>
             </form>
           </div>
           <div class="header-actions">
+            <a class="header-track" href="#track"><span>◉</span><b>Track Order</b></a>
             <button class="cart-btn" onclick="location.hash='#cart'" aria-label="Cart">🛒<span data-cart-count>0</span></button>
           </div>
+        </div>
+        <div class="nav-row">
+          <nav id="main-menu">
+            <a class="nav-category" href="#shop" onclick="closeMenu()">☰ <span>All Categories</span></a>
+            <a href="#home" onclick="closeMenu()">Home</a>
+            <a href="#shop?category=Gadget%20%26%20Accessories" onclick="closeMenu()">Gadget & Accessories</a>
+            <a href="#shop" onclick="closeMenu()">New Arrivals</a>
+            <a href="#offers" onclick="closeMenu()">Deals</a>
+            <a href="#support" onclick="closeMenu()">About Us</a>
+            <a href="#support" onclick="closeMenu()">Contact</a>
+          </nav>
         </div>
       </header>`;
   }
@@ -167,86 +180,91 @@
       <nav class="bottom-nav">
         <a href="#home">⌂<small>Home</small></a>
         <a href="#shop">▦<small>Categories</small></a>
-        <a href="#cart">🛒<small>Cart</small><b data-cart-count>0</b></a>
-        <a href="#account">◉<small>Account</small></a>
+        <a href="#cart" class="dock-cart">🛒<small>Cart</small><b data-cart-count>0</b></a>
+        <a href="#track">◷<small>Orders</small></a>
       </nav>`;
   }
 
   function productCard(p) {
     const disabled = p.stock === "Out of Stock" ? "disabled" : "";
+    const discount = p.oldPrice && Number(p.oldPrice) > Number(p.price)
+      ? Math.round((1 - Number(p.price) / Number(p.oldPrice)) * 100)
+      : 0;
     return `
       <article class="product-card">
         <a href="#product/${p.id}" class="product-media">${productImage(p)}</a>
-        ${p.badge ? `<span class="badge">${escapeHtml(p.badge)}</span>` : ""}
+        ${discount ? `<span class="badge">-${discount}%</span>` : p.deal ? `<span class="badge">DEAL</span>` : ""}
         <div class="product-body">
-          <small class="muted">${escapeHtml(p.brand)} · ${escapeHtml(p.category)}</small>
+          <small class="muted">${escapeHtml(p.brand || "Gadget")} · ${escapeHtml(p.category || "Accessories")}</small>
           <a href="#product/${p.id}" class="product-name">${escapeHtml(p.name)}</a>
-          <span class="${stockClass(p.stock)}">${escapeHtml(p.stock)}</span>
           <div class="price-row">
             <strong>${money(p.price)}</strong>
             ${p.oldPrice ? `<del>${money(p.oldPrice)}</del>` : ""}
           </div>
-          <button class="quick-add" ${disabled} onclick="addToCart('${p.id}', '${escapeHtml(p.sku || "")}')">${disabled ? "Out of Stock" : "+ Add to Cart"}</button>
+          <span class="${stockClass(p.stock)}">${escapeHtml(p.stock)}</span>
+          <button class="quick-add" ${disabled} onclick="addToCart('${p.id}', '${escapeHtml(p.sku || "")}')">${disabled ? "Out of Stock" : "🛒 Add to Cart"}</button>
         </div>
       </article>`;
   }
 
   function homePage() {
-    const featured = products.slice(0, 4);
+    const featured = products.filter(p => p.featured).slice(0, 4);
+    const featuredProducts = featured.length ? featured : products.slice(0, 4);
+    const deals = products.filter(p => p.deal || Number(p.oldPrice) > Number(p.price)).slice(0, 4);
+    const arrivals = products.filter(p => p.newArrival).slice(0, 4);
     return `
       ${header()}
       <main>
         <section class="hero">
           <div class="hero-copy">
-            <span class="eyebrow">TRUSTED MOBILE & ACCESSORIES STORE</span>
-            <h1>Premium Tech.<br><span>Better Together.</span></h1>
-            <p>Smartphones are coming soon. Until then, explore our latest gadgets & accessories with easy checkout and simple service.</p>
+            <span class="eyebrow">PREMIUM GADGETS & ACCESSORIES</span>
+            <h1>Technology that<br><span>fits your life.</span></h1>
+            <p>Discover quality gadgets, smart accessories and everyday tech essentials with easy ordering and fast delivery across Bangladesh.</p>
             <div class="hero-actions">
-              <a class="btn primary" href="#shop">Shop Now</a>
-              <a class="btn ghost" href="#track">Track Order</a>
+              <a class="btn primary" href="#shop">Shop Now →</a>
+              <a class="btn ghost" href="#offers">Explore Deals</a>
             </div>
           </div>
-          <div class="hero-art" aria-hidden="true"></div>
-          <div class="hero-blend" aria-hidden="true"></div>
+          <div class="hero-slide-count"><span class="active">01</span><i>/</i><span>03</span><button aria-label="Next banner">→</button></div>
         </section>
 
         <section class="trust-strip">
-          <div><b>🛡️</b><span>Authentic Products</span></div>
-          <div><b>🚚</b><span>Fast Delivery</span></div>
-          <div><b>🔒</b><span>Secure Checkout</span></div>
-          <div><b>↻</b><span>Easy Return</span></div>
+          <div><b>◈</b><span><strong>100% Original</strong><small>Products guaranteed</small></span></div>
+          <div><b>▣</b><span><strong>Cash on Delivery</strong><small>Available nationwide</small></span></div>
+          <div><b>⌁</b><span><strong>Fast Delivery</strong><small>Across Bangladesh</small></span></div>
+          <div><b>↻</b><span><strong>Easy Return</strong><small>7 days policy</small></span></div>
         </section>
 
-        <section class="section">
+        <section class="section category-section">
           <div class="section-head"><div><span class="eyebrow">EXPLORE</span><h2>Shop by Category</h2></div><a href="#shop">View All →</a></div>
-          <div class="category-grid">${categories.map(([name, coming]) =>
-            coming
-              ? `<a class="category-card coming" href="#shop?category=${encodeURIComponent(name)}"><b>${name}</b><small>Coming Later</small></a>`
-              : `<a class="category-card" href="#shop?category=${encodeURIComponent(name)}"><b>${name}</b></a>`
+          <div class="category-grid">${categories.filter(([name]) => !["Mobile","Feature Phone"].includes(name)).map(([name]) =>
+            `<a class="category-card" href="#shop?category=${encodeURIComponent(name)}"><b>${escapeHtml(name)}</b><small>Explore →</small></a>`
           ).join("")}</div>
         </section>
 
-        <section class="section soft">
-          <div class="section-head"><div><span class="eyebrow">CURATED FOR YOU</span><h2>Featured Products</h2></div><a href="#shop">View All →</a></div>
-          <div class="product-grid">${featured.map(productCard).join("")}</div>
+        <section class="promo-grid">
+          <a class="promo-card promo-deals" href="#offers"><div><span class="eyebrow">LIMITED TIME</span><h2>Up to 50% OFF</h2><p>Flash deals on selected gadgets and accessories.</p><span class="promo-btn">Shop Deals →</span></div><div class="promo-orb">⚡</div></a>
+          <a class="promo-card promo-arrivals" href="#shop"><div><span class="eyebrow">JUST IN</span><h2>New Arrivals</h2><p>Fresh gadgets and accessories, ready for your setup.</p><span class="promo-btn">Explore →</span></div><div class="promo-orb">✦</div></a>
         </section>
 
-        ${products.some(p=>p.deal || p.oldPrice) ? `<section class="section"><div class="section-head"><div><span class="eyebrow">BEST VALUE</span><h2>Deals</h2></div><a href="#shop">Shop Deals →</a></div><div class="product-grid">${products.filter(p=>p.deal || p.oldPrice).slice(0,4).map(productCard).join("")}</div></section>` : ""}
-
-        ${products.some(p=>p.newArrival) ? `<section class="section soft"><div class="section-head"><div><span class="eyebrow">JUST IN</span><h2>New Arrivals</h2></div><a href="#shop">View All →</a></div><div class="product-grid">${products.filter(p=>p.newArrival).slice(0,4).map(productCard).join("")}</div></section>` : ""}
-
-        <section class="promo">
-          <div><span class="eyebrow">FLASH GEAR PROMISE</span><h2>Simple shopping.<br>Clear information.</h2><p>See product availability as In Stock, Low Stock or Out of Stock. No confusing quantity displays.</p></div>
-          <a class="btn light" href="#shop">Explore Products</a>
+        <section class="section product-section">
+          <div class="section-head"><div><span class="eyebrow">HANDPICKED</span><h2>Featured Products</h2></div><a href="#shop">View All →</a></div>
+          <div class="product-tabs"><span class="active">Featured</span><a href="#shop">Best Sellers</a><a href="#shop">New Arrivals</a><a href="#offers">Deals</a></div>
+          <div class="product-grid">${featuredProducts.length ? featuredProducts.map(productCard).join("") : `<div class="empty">Products will appear here once they are published.</div>`}</div>
         </section>
 
-        <section class="section">
-          <div class="section-head"><div><span class="eyebrow">NEED HELP?</span><h2>We’re here for you</h2></div><a href="#support">Contact Support →</a></div>
-          <div class="support-cards">
-            <a href="#support">💬 <b>WhatsApp</b><span>Chat with us</span></a>
-            <a href="#support">☎️ <b>Call Us</b><span>Get quick help</span></a>
-            <a href="#faq">❓ <b>FAQ</b><span>Find answers</span></a>
-          </div>
+        ${deals.length ? `<section class="section soft product-section"><div class="section-head"><div><span class="eyebrow">BEST VALUE</span><h2>Flash Deals</h2></div><a href="#offers">View Deals →</a></div><div class="product-grid">${deals.map(productCard).join("")}</div></section>` : ""}
+
+        ${arrivals.length ? `<section class="section product-section"><div class="section-head"><div><span class="eyebrow">LATEST</span><h2>New Arrivals</h2></div><a href="#shop">View All →</a></div><div class="product-grid">${arrivals.map(productCard).join("")}</div></section>` : ""}
+
+        <section class="popular-band">
+          <div class="section-head"><div><span class="eyebrow">DISCOVER MORE</span><h2>Popular Gadgets</h2></div><a href="#shop">View All →</a></div>
+          <div class="popular-grid">${gadgetSubcategories.map(([name]) => `<a href="#shop?category=${encodeURIComponent(name)}"><b>${escapeHtml(name)}</b><small>Explore →</small></a>`).join("")}</div>
+        </section>
+
+        <section class="blue-promise">
+          <div><span class="eyebrow">FLASH GEAR BD</span><h2>Better gadgets.<br>Better everyday.</h2><p>Shop confidently with clear pricing, simple checkout and live product availability.</p></div>
+          <a class="btn light" href="#shop">Start Shopping →</a>
         </section>
       </main>
       ${footer()}${bottomNav()}`;
@@ -410,7 +428,18 @@
   }
 
   function footer() {
-    return `<footer><div class="footer-brand"><img src="${logo}" alt="Flash Gear BD"><div><b>FLASH GEAR BD</b><span>Mobile & Accessories Store</span></div></div><div class="footer-grid"><div><b>Shop</b><a href="#shop">All Products</a><a href="#offers">Offers</a><a href="#track">Track Order</a></div><div><b>Help</b><a href="#support">Support</a><a href="#faq">FAQ</a><a href="tel:+8801601093553">+8801601093553</a></div><div><b>Visit</b><span>Meridian Kohinoor City Level 5, 537 No. Shop</span><span>11 AM – 9 PM</span><span>Chattogram, Bangladesh</span></div></div><div class="footer-payment"><b>Payment:</b> Cash on Delivery · bKash · Nagad · Bank Transfer</div><small>© ${new Date().getFullYear()} Flash Gear BD. All rights reserved.</small></footer>`;
+    return `<footer>
+      <div class="footer-main">
+        <div class="footer-brand"><img src="${logo}" alt="Flash Gear BD"><div><b>FLASH GEAR BD</b><span>Your Gadget Partner</span><p>Quality gadgets, better life. Flash Gear BD brings you the latest tech and accessories at the best price in Bangladesh.</p></div></div>
+        <div class="footer-grid">
+          <div><b>Quick Links</b><a href="#home">Home</a><a href="#shop">All Products</a><a href="#offers">Deals</a><a href="#track">Track Order</a></div>
+          <div><b>Categories</b><a href="#shop?category=Gadget%20%26%20Accessories">Gadget & Accessories</a><a href="#shop?category=Charger">Charger & Adapter</a><a href="#shop?category=Cable%20%26%20Adapter">Cable & Adapter</a><a href="#shop?category=Earbuds">Earbuds</a><a href="#shop?category=Headphones">Headphones</a></div>
+          <div><b>Customer Service</b><a href="#support">Support</a><a href="#faq">FAQ</a><a href="tel:+8801601093553">+8801601093553</a><a href="mailto:flashgearbd@gmail.com">flashgearbd@gmail.com</a></div>
+          <div><b>Visit Us</b><span>Meridian Kohinoor City Level 5, 537 No. Shop</span><span>11 AM – 9 PM</span><span>Chattogram, Bangladesh</span></div>
+        </div>
+      </div>
+      <div class="footer-bottom"><span>© ${new Date().getFullYear()} Flash Gear BD. All rights reserved.</span><span>Cash on Delivery · bKash · Nagad · Bank Transfer</span></div>
+    </footer>`;
   }
 
   function addToCart(id, sku = "") {
@@ -519,6 +548,7 @@
   }
   function setCategory(v) { currentCategory = v; render(); }
   function toggleMenu() { document.getElementById("main-menu")?.classList.toggle("open"); }
+  function closeMenu() { document.getElementById("main-menu")?.classList.remove("open"); }
 
   const requiredCheckoutFields = ["name", "phone", "division", "district", "address"];
 
@@ -725,6 +755,7 @@
   window.chooseHeaderSuggestion = chooseHeaderSuggestion;
   window.setCategory = setCategory;
   window.toggleMenu = toggleMenu;
+  window.closeMenu = closeMenu;
   window.changeTempQty = changeTempQty;
   window.placeOrder = placeOrder;
   window.selectVariant = selectVariant;

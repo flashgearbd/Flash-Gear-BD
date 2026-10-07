@@ -1,47 +1,19 @@
-# Flash Gear BD — FGBD V1.0.23
+# Flash Gear BD — V1.0.24
 
-## V1.0.23 authentication/redirect fix
+Customer website redesign based on the approved blue premium electronics-store pattern.
 
-This version keeps all V1.0.21 website/admin/inventory fixes and targets the remaining `Backend returned an invalid response for adminLogin` problem.
-
-### Changes
-- Cloudflare Worker now uses standard Fetch redirect following for Google Apps Script Web App responses.
-- This targets the Apps Script POST -> 302 -> ContentService JSON response flow used by `adminLogin` and other POST actions.
-- Upstream JSON parsing is UTF-8 BOM safe.
-- Invalid upstream responses now expose HTTP status, content type, and a safe response snippet for diagnosis.
-- Admin UI now displays backend diagnostic detail instead of hiding it behind the generic error message.
-- Existing API key handling remains: `FGBD_API_KEY` is sent to Apps Script in the query string and POST body, while the secret remains in Cloudflare/App Script configuration rather than GitHub.
-
-## Included
-- Automatic Product IDs, SKUs and Variant IDs.
-- Product/variant management, stock, pricing, categories, suppliers, purchases, expenses and reports.
-- Admin login/session management, failed-login lockout, password change and activity log.
-- Live Google Sheets catalog and order backend.
-- Customer checkout, order tracking, delivery calculation and payment methods.
-- Product image upload/Drive thumbnail handling.
-- Live search suggestions.
-- Mobile-first customer and admin UI.
-- No `assets` folder.
+## V1.0.24 design changes
+- Complete blue/navy/white storefront redesign
+- New announcement strip, header, search placement, navigation and hero layout
+- Blue promotional cards, featured/deal/new-arrival sections and popular gadgets
+- Text-only category presentation
+- Search remains in the main header only; it is NOT in the bottom dock or navigation
+- Mobile bottom dock: Home, Categories, Cart, Orders
+- Responsive mobile-first layout
+- Existing live Google Sheets product data preserved
+- Existing checkout, delivery, payment and tracking flows preserved
+- Existing V1.0.23 Admin/Apps Script backend preserved unchanged
+- No assets folder
 
 ## Deployment
-
-1. Replace the Apps Script project code with the full `Flash_Gear_BD_AppsScript_V1.0.23.gs` file.
-2. In Apps Script, run `setupStore()` once if required. It preserves existing data and creates missing headers/categories.
-3. Deploy the Apps Script as a new Web App version using the same Web App URL/access settings.
-4. Deploy the Cloudflare Worker/site from this package to the production `main` branch.
-5. Keep the existing Cloudflare secrets:
-   - `APPS_SCRIPT_URL`
-   - `FGBD_API_KEY`
-6. Keep the same Apps Script Script Property:
-   - `FGBD_API_KEY`
-
-## Important
-
-Do not put Google credentials or API secrets into GitHub. The `.gs` file is the application source/reference; Cloudflare secrets and Apps Script Script Properties hold the sensitive API key.
-
-### V1.0.23 admin login transport fix
-- The browser continues to send `adminLogin` as a POST to Cloudflare.
-- Cloudflare converts only `adminLogin` into an HTTPS GET to the Apps Script `doGet` endpoint.
-- Apps Script now handles `action=adminLogin` in `doGet` and returns the normal JSON response.
-- This avoids the Google Apps Script POST ContentService HTML wrapper that was reaching Cloudflare.
-- All other POST actions remain POST.
+Upload all files in this folder to the repository root and deploy the same Cloudflare Worker. Do not change APPS_SCRIPT_URL or FGBD_API_KEY. The Apps Script backend remains the working V1.0.23 version.

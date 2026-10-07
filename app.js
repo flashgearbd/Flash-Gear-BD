@@ -143,7 +143,7 @@
       </div>
       <header class="topbar">
         <div class="topbar-inner">
-          <button class="icon-btn mobile-menu" onclick="toggleMenu()" aria-label="Menu">☰</button>
+          <button class="icon-btn mobile-menu" onclick="toggleMenu()" aria-label="Open menu" aria-controls="sideDrawer" aria-expanded="false">☰</button>
           <a class="brand" href="#home" onclick="closeMenu()">
             <img src="${logo}" alt="Flash Gear BD">
             <span><b>FLASH GEAR BD</b><small>Your Gadget Partner</small></span>
@@ -172,7 +172,32 @@
             <a href="#support" onclick="closeMenu()">Contact</a>
           </nav>
         </div>
-      </header>`;
+      </header>
+      <div id="drawerBackdrop" class="drawer-backdrop" onclick="closeMenu()" aria-hidden="true"></div>
+      <aside id="sideDrawer" class="side-drawer" aria-hidden="true" aria-label="Site menu">
+        <div class="drawer-head">
+          <a class="drawer-brand" href="#home" onclick="closeMenu()"><img src="${logo}" alt="Flash Gear BD"><span><b>FLASH GEAR BD</b><small>Your Gadget Partner</small></span></a>
+          <button class="drawer-close" onclick="closeMenu()" aria-label="Close menu">×</button>
+        </div>
+        <nav class="drawer-nav">
+          <a class="drawer-link active" href="#home" onclick="closeMenu()"><span>⌂</span><b>Home</b></a>
+          <a class="drawer-link" href="#shop" onclick="closeMenu()"><span>▦</span><b>All Categories</b><em>›</em></a>
+          <a class="drawer-link" href="#shop?category=Gadget%20%26%20Accessories" onclick="closeMenu()"><span>◉</span><b>Gadget & Accessories</b><em>›</em></a>
+          <a class="drawer-link" href="#shop" onclick="closeMenu()"><span>✦</span><b>New Arrivals</b><em>›</em></a>
+          <a class="drawer-link" href="#offers" onclick="closeMenu()"><span>◇</span><b>Deals</b><em>›</em></a>
+          <a class="drawer-link" href="#support" onclick="closeMenu()"><span>ⓘ</span><b>About Us</b><em>›</em></a>
+          <a class="drawer-link" href="#support" onclick="closeMenu()"><span>✉</span><b>Contact</b><em>›</em></a>
+        </nav>
+        <div class="drawer-divider"></div>
+        <div class="drawer-title">Quick Links</div>
+        <nav class="drawer-nav drawer-quick">
+          <a class="drawer-link" href="#track" onclick="closeMenu()"><span>◷</span><b>Track Order</b><em>›</em></a>
+          <a class="drawer-link" href="#support" onclick="closeMenu()"><span>?</span><b>Help & Support</b><em>›</em></a>
+          <a class="drawer-link" href="#faq" onclick="closeMenu()"><span>≡</span><b>FAQs</b><em>›</em></a>
+        </nav>
+        <div class="drawer-help"><span>☎</span><div><b>Need Help?</b><small>We're here 11 AM – 9 PM</small></div><a href="tel:+8801601093553">Call</a></div>
+        <div class="drawer-footer">Flash Gear BD · Your Gadget Partner</div>
+      </aside>`;
   }
 
   function bottomNav() {
@@ -242,8 +267,7 @@
           ).join("")}</div>
         </section>
 
-        <section class="promo-grid">
-          <a class="promo-card promo-deals" href="#offers"><div><span class="eyebrow">LIMITED TIME</span><h2>Up to 50% OFF</h2><p>Flash deals on selected gadgets and accessories.</p><span class="promo-btn">Shop Deals →</span></div><div class="promo-orb">⚡</div></a>
+        <section class="promo-grid promo-grid-single">
           <a class="promo-card promo-arrivals" href="#shop"><div><span class="eyebrow">JUST IN</span><h2>New Arrivals</h2><p>Fresh gadgets and accessories, ready for your setup.</p><span class="promo-btn">Explore →</span></div><div class="promo-orb">✦</div></a>
         </section>
 
@@ -547,8 +571,31 @@
     location.hash = `#search?q=${encodeURIComponent(currentSearch)}`;
   }
   function setCategory(v) { currentCategory = v; render(); }
-  function toggleMenu() { document.getElementById("main-menu")?.classList.toggle("open"); }
-  function closeMenu() { document.getElementById("main-menu")?.classList.remove("open"); }
+  function toggleMenu() {
+    const drawer = document.getElementById("sideDrawer");
+    const backdrop = document.getElementById("drawerBackdrop");
+    const button = document.querySelector(".mobile-menu");
+    if (!drawer || !backdrop) return;
+    const open = !drawer.classList.contains("open");
+    drawer.classList.toggle("open", open);
+    backdrop.classList.toggle("open", open);
+    drawer.setAttribute("aria-hidden", open ? "false" : "true");
+    backdrop.setAttribute("aria-hidden", open ? "false" : "true");
+    button?.setAttribute("aria-expanded", open ? "true" : "false");
+    document.body.classList.toggle("drawer-open", open);
+  }
+  function closeMenu() {
+    document.getElementById("main-menu")?.classList.remove("open");
+    const drawer = document.getElementById("sideDrawer");
+    const backdrop = document.getElementById("drawerBackdrop");
+    const button = document.querySelector(".mobile-menu");
+    drawer?.classList.remove("open");
+    backdrop?.classList.remove("open");
+    drawer?.setAttribute("aria-hidden", "true");
+    backdrop?.setAttribute("aria-hidden", "true");
+    button?.setAttribute("aria-expanded", "false");
+    document.body.classList.remove("drawer-open");
+  }
 
   const requiredCheckoutFields = ["name", "phone", "division", "district", "address"];
 

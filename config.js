@@ -1,6 +1,6 @@
 /*
   FLASH GEAR BD — Frontend configuration
-  FGBD V1.0.24
+  FGBD V1.0.26
 
   Production architecture:
     Website -> Cloudflare Worker /api -> Google Apps Script -> Google Sheets

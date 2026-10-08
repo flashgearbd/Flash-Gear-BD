@@ -291,7 +291,7 @@
           <a class="btn light" href="#shop">Start Shopping →</a>
         </section>
       </main>
-      ${footer()}${bottomNav()}`;
+      ${footer()}`;
   }
 
   function shopPage() {
@@ -320,12 +320,12 @@
           </aside>
           <section><div class="results-head"><span>${filtered.length} products</span><select><option>Recommended</option><option>Price: Low to High</option><option>Price: High to Low</option><option>Newest</option></select></div><div class="product-grid">${filtered.length ? filtered.map(productCard).join("") : `<div class="empty">No products found.</div>`}</div></section>
         </div>`}
-      </main>${footer()}${bottomNav()}`;
+      </main>${footer()}`;
   }
 
   function productPage(id) {
     const p = products.find(x => x.id === id) || products[0];
-    if (!p) return `${header()}<main class="page"><div class="empty">Product not found.</div></main>${footer()}${bottomNav()}`;
+    if (!p) return `${header()}<main class="page"><div class="empty">Product not found.</div></main>${footer()}`;
     const variants = Array.isArray(p.variants) && p.variants.length ? p.variants : [{ sku: p.sku || "", variantId: p.variantId || p.sku || "", variant: p.variant || "", price: p.price, oldPrice: p.oldPrice, stock: p.stock, image: p.image, images: p.images || [] }];
     const selectedSku = selectedVariants[p.id] || variants[0].sku;
     const selected = variants.find(v => v.sku === selectedSku) || variants[0];
@@ -353,7 +353,7 @@
           </div>
         </div>
         <section class="section"><div class="section-head"><div><span class="eyebrow">COMPLETE YOUR SETUP</span><h2>Frequently Bought Together</h2></div></div><div class="product-grid">${products.filter(x=>x.id!==p.id).slice(0,3).map(productCard).join("")}</div></section>
-      </main>${footer()}${bottomNav()}`;
+      </main>${footer()}`;
   }
 
   function selectProductImage(url) {
@@ -385,7 +385,7 @@
         <div class="qty"><button onclick="changeCart('${escapeHtml(item.cartKey || item.id)}',-1)">−</button><span>${item.qty}</span><button onclick="changeCart('${escapeHtml(item.cartKey || item.id)}',1)">+</button></div><button class="remove" onclick="removeCart('${escapeHtml(item.cartKey || item.id)}')">×</button></div>`).join("")}</div>
       <div class="summary"><div><span>Subtotal</span><b>${money(total)}</b></div><div><span>Delivery</span><b>Calculated at checkout</b></div><hr><div class="grand"><span>Total</span><b>${money(total)}</b></div><a class="btn primary full" href="#checkout">Checkout</a><a class="btn outline full" href="#shop">Continue Shopping</a></div>`
       : `<div class="empty"><div class="empty-icon">🛒</div><h2>Your cart is empty</h2><p>Add something you love and come back here.</p><a class="btn primary" href="#shop">Start Shopping</a></div>`}
-      </main>${footer()}${bottomNav()}`;
+      </main>${footer()}`;
   }
 
   function checkoutPage() {
@@ -412,32 +412,32 @@
         </div>
         <div class="delivery-note-card"><b>🚚 Delivery</b><span>Chattogram District: ${money(60)} · Other Districts: ${money(120)}</span><span class="free-delivery-progress" id="freeDeliveryMessage">Free delivery eligibility is checked automatically.</span></div>
         <div class="summary checkout-summary"><div><span>Subtotal</span><b>${money(total)}</b></div><div><span>Delivery</span><b id="deliveryAmount">Calculated after address</b></div><hr><div class="grand"><span>Total</span><b id="checkoutGrandTotal">${money(total)}</b></div><button id="placeOrderBtn" class="btn primary full order-submit" type="button" disabled onclick="placeOrder()">Place Order</button><small class="legal">All required fields must be completed correctly. By placing your order, you agree to our Terms & Conditions and Privacy Policy.</small></div>
-      </section></main>${footer()}${bottomNav()}`;
+      </section></main>${footer()}`;
   }
 
   function confirmationPage() {
     const subtotal = Number(window.demoSubtotal || 0);
     const shipping = Number(window.demoShipping || 0);
     const total = Number(window.demoTotal || 0);
-    return `${header()}<main class="page narrow"><div class="success-card"><div class="success-icon">✓</div><span class="eyebrow">THANK YOU</span><h1>Order Confirmed!</h1><p>Your order has been received. We’ll contact you shortly to confirm delivery details.</p><b>Order ID: <span id="demoOrderId">${escapeHtml(window.demoOrderId || "—")}</span></b><div class="confirmation-breakdown"><span>Subtotal <b>${money(subtotal)}</b></span><span>Delivery <b>${shipping ? money(shipping) : "FREE"}</b></span><strong>Total <b>${money(total)}</b></strong></div><a class="btn primary full" href="#track">Track Your Order</a><a class="btn outline full" href="#home">Back to Home</a></div></main>${footer()}${bottomNav()}`;
+    return `${header()}<main class="page narrow"><div class="success-card"><div class="success-icon">✓</div><span class="eyebrow">THANK YOU</span><h1>Order Confirmed!</h1><p>Your order has been received. We’ll contact you shortly to confirm delivery details.</p><b>Order ID: <span id="demoOrderId">${escapeHtml(window.demoOrderId || "—")}</span></b><div class="confirmation-breakdown"><span>Subtotal <b>${money(subtotal)}</b></span><span>Delivery <b>${shipping ? money(shipping) : "FREE"}</b></span><strong>Total <b>${money(total)}</b></strong></div><a class="btn primary full" href="#track">Track Your Order</a><a class="btn outline full" href="#home">Back to Home</a></div></main>${footer()}`;
   }
 
   function trackPage() {
     return `${header()}<main class="page narrow"><section class="page-head"><span class="eyebrow">ORDER TRACKING</span><h1>Track your order.</h1><p>Enter your Order ID and phone number to view your latest status.</p></section>
       <div class="form-card"><label>Order ID<input placeholder="e.g. FG-10258"></label><label>Phone Number<div class="phone-field"><span>+88</span><input inputmode="numeric" maxlength="11" placeholder="01XXXXXXXXX"></div></label><button class="btn primary full" onclick="showDemoTracking()">Track Order</button></div>
-      <div id="tracking-result"></div></main>${footer()}${bottomNav()}`;
+      <div id="tracking-result"></div></main>${footer()}`;
   }
 
   function searchPage() {
-    return `${header()}<main class="page"><section class="page-head"><span class="eyebrow">SEARCH</span><h1>What are you looking for?</h1></section><div class="searchbar"><input autofocus placeholder="Search products..." oninput="setSearch(this.value); render()" value="${escapeHtml(currentSearch)}"><button>⌕</button></div><div class="product-grid">${products.filter(p => !currentSearch || `${p.name} ${p.brand} ${p.category} ${p.subcategory || ""} ${p.sku || ""}`.toLowerCase().includes(currentSearch.toLowerCase())).map(productCard).join("")}</div></main>${footer()}${bottomNav()}`;
+    return `${header()}<main class="page"><section class="page-head"><span class="eyebrow">SEARCH</span><h1>What are you looking for?</h1></section><div class="searchbar"><input autofocus placeholder="Search products..." oninput="setSearch(this.value); render()" value="${escapeHtml(currentSearch)}"><button>⌕</button></div><div class="product-grid">${products.filter(p => !currentSearch || `${p.name} ${p.brand} ${p.category} ${p.subcategory || ""} ${p.sku || ""}`.toLowerCase().includes(currentSearch.toLowerCase())).map(productCard).join("")}</div></main>${footer()}`;
   }
 
   function accountPage() {
-    return `${header()}<main class="page narrow"><section class="account-card"><div class="avatar">👤</div><div><h1>My Account</h1><p class="muted">Guest account — create an account later to save addresses and order history.</p></div></section><div class="menu-list"><a href="#track">📦 <b>Track Order</b><span>→</span></a><a href="#shop">🕘 <b>Recently Viewed</b><span>→</span></a><a href="#support">💬 <b>Support</b><span>→</span></a><a href="#faq">❓ <b>FAQ</b><span>→</span></a></div></main>${footer()}${bottomNav()}`;
+    return `${header()}<main class="page narrow"><section class="account-card"><div class="avatar">👤</div><div><h1>My Account</h1><p class="muted">Guest account — create an account later to save addresses and order history.</p></div></section><div class="menu-list"><a href="#track">📦 <b>Track Order</b><span>→</span></a><a href="#shop">🕘 <b>Recently Viewed</b><span>→</span></a><a href="#support">💬 <b>Support</b><span>→</span></a><a href="#faq">❓ <b>FAQ</b><span>→</span></a></div></main>${footer()}`;
   }
 
   function supportPage() {
-    return `${header()}<main class="page narrow"><section class="page-head"><span class="eyebrow">SUPPORT</span><h1>Need Help?</h1><p>We’re here every day from 11 AM – 9 PM.</p></section><div class="support-list"><a href="https://wa.me/8801891656945" target="_blank" rel="noopener"><span>🟢</span><div><b>WhatsApp</b><small>01891656945</small></div><strong>→</strong></a><a href="tel:+8801601093553"><span>📞</span><div><b>Call Us</b><small>+8801601093553</small></div><strong>→</strong></a><a href="mailto:flashgearbd@gmail.com"><span>✉️</span><div><b>Email</b><small>flashgearbd@gmail.com</small></div><strong>→</strong></a></div><div class="help-banner">📍 <b>Visit Flash Gear BD</b><span>Meridian Kohinoor City Level 5, 537 No. Shop · 11 AM – 9 PM</span></div></main>${footer()}${bottomNav()}`;
+    return `${header()}<main class="page narrow"><section class="page-head"><span class="eyebrow">SUPPORT</span><h1>Need Help?</h1><p>We’re here every day from 11 AM – 9 PM.</p></section><div class="support-list"><a href="https://wa.me/8801891656945" target="_blank" rel="noopener"><span>🟢</span><div><b>WhatsApp</b><small>01891656945</small></div><strong>→</strong></a><a href="tel:+8801601093553"><span>📞</span><div><b>Call Us</b><small>+8801601093553</small></div><strong>→</strong></a><a href="mailto:flashgearbd@gmail.com"><span>✉️</span><div><b>Email</b><small>flashgearbd@gmail.com</small></div><strong>→</strong></a></div><div class="help-banner">📍 <b>Visit Flash Gear BD</b><span>Meridian Kohinoor City Level 5, 537 No. Shop · 11 AM – 9 PM</span></div></main>${footer()}`;
   }
 
   function faqPage() {
@@ -448,7 +448,7 @@
       ["Will the website show exact stock quantity?", "No. Customers only see In Stock, Low Stock or Out of Stock."],
       ["How do I get support?", "Contact Flash Gear BD through the support options provided on the website."]
     ];
-    return `${header()}<main class="page narrow"><section class="page-head"><span class="eyebrow">FAQ</span><h1>Frequently Asked Questions</h1></section><div class="faq">${qs.map(([q,a])=>`<details><summary>${q}</summary><p>${a}</p></details>`).join("")}</div></main>${footer()}${bottomNav()}`;
+    return `${header()}<main class="page narrow"><section class="page-head"><span class="eyebrow">FAQ</span><h1>Frequently Asked Questions</h1></section><div class="faq">${qs.map(([q,a])=>`<details><summary>${q}</summary><p>${a}</p></details>`).join("")}</div></main>${footer()}`;
   }
 
   function footer() {
@@ -783,6 +783,8 @@
     const app = document.getElementById("app");
     app.classList.remove("page-enter");
     app.innerHTML = html;
+    const dockRoot = document.getElementById("mobileDockRoot");
+    if (dockRoot) dockRoot.innerHTML = bottomNav();
     void app.offsetWidth;
     app.classList.add("page-enter");
     updateCartCount();

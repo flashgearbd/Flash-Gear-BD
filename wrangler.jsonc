@@ -6,8 +6,11 @@
   "assets": {
     "directory": ".",
     "binding": "ASSETS",
+    "html_handling": "none",
     "run_worker_first": [
-      "/api/*"
+      "/api/*",
+      "/admin",
+      "/admin/"
     ],
     "not_found_handling": "404-page"
   }

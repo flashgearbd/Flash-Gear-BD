@@ -73,26 +73,38 @@ async function handleApi(request, env, url){
   return json(result.data,result.status,request,env);
 }
 async function callAppsScript(baseUrl, body){
-  // Google Apps Script Web Apps return ContentService responses through a
-  // generated googleusercontent.com redirect. Let the Workers Fetch runtime
-  // follow that redirect. The original request remains POST with the JSON body;
-  // the generated redirect target contains the already-created response and
-  // does not contain the password, API key, or session token.
+  // Apps Script Web Apps commonly respond with one or more redirects before
+  // returning the ContentService JSON. Follow them explicitly so a POST is
+  // converted to GET on 301/302/303 exactly as Google expects.
   try{
-    const upstream=await fetch(baseUrl,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Accept':'application/json'},
-      body:JSON.stringify(body),
-      redirect:'follow'
-    });
-    const type=String(upstream.headers.get('content-type')||'');
-    let text=String(await upstream.text()||'').replace(/^\uFEFF/,'').trim();
-    let data;
-    try{data=text?JSON.parse(text):{};}catch(_){
-      return {status:502,data:{ok:false,error:`Backend returned an invalid response for ${body.action}.`,detail:text.replace(/\s+/g,' ').slice(0,500),upstreamStatus:upstream.status,upstreamContentType:type||'unknown'}};
+    let target=baseUrl;
+    let method='POST';
+    let payload=JSON.stringify(body);
+    for(let hop=0;hop<6;hop++){
+      const upstream=await fetch(target,{
+        method,
+        headers:{'Content-Type':'application/json','Accept':'application/json'},
+        body:method==='GET'?undefined:payload,
+        redirect:'manual'
+      });
+      if([301,302,303,307,308].includes(upstream.status)){
+        const location=upstream.headers.get('Location');
+        if(!location)return {status:502,data:{ok:false,error:`Backend redirect missing Location for ${body.action}.`}};
+        target=new URL(location,target).toString();
+        if([301,302,303].includes(upstream.status))method='GET';
+        continue;
+      }
+      const type=String(upstream.headers.get('content-type')||'');
+      let text=String(await upstream.text()||'').replace(/^\uFEFF/,'').trim();
+      let data;
+      try{data=text?JSON.parse(text):{};}catch(_){
+        const looksGoogleLogin=/accounts\.google\.com|ServiceLogin|Sign in to Google|<html/i.test(text);
+        return {status:502,data:{ok:false,error:`Backend returned an invalid response for ${body.action}.`,detail:(looksGoogleLogin?'Apps Script returned a Google authorization page. Verify the Web App deployment is accessible to anyone, then redeploy the latest Apps Script. ':'' )+text.replace(/\s+/g,' ').slice(0,500),upstreamStatus:upstream.status,upstreamContentType:type||'unknown'}};
+      }
+      if(upstream.status===401||String(data.error||'').toLowerCase()==='unauthorized')return {status:401,data:{ok:false,error:'Backend authorization failed.'}};
+      return {status:upstream.status,data};
     }
-    if(upstream.status===401||String(data.error||'').toLowerCase()==='unauthorized')return {status:401,data:{ok:false,error:'Backend authorization failed.'}};
-    return {status:upstream.status,data};
+    return {status:502,data:{ok:false,error:`Backend redirect limit exceeded for ${body.action}.`}};
   }catch(err){
     return {status:502,data:{ok:false,error:`Backend request failed for ${body.action}.`,detail:String(err&&err.message||err)}};
   }

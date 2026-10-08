@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,">
+<title>FLASH GEAR BD — Admin</title>
+<link rel="stylesheet" href="/admin.css">
+</head>
+<body>
+<div id="loginView" class="login-shell">
+  <div class="login-card">
+    <img src="/flash-gear-logo.png" class="admin-logo" alt="Flash Gear BD">
+    <div class="eyebrow">PRIVATE ADMIN PANEL</div>
+    <h1>Flash Gear BD</h1>
+    <p>Manage products, orders, stock and store settings.</p>
+    <form id="loginForm">
+      <label>Username<input id="loginUser" autocomplete="username" value="admin" required></label>
+      <label>Password<div class="password-row"><input id="loginPass" type="password" autocomplete="current-password" required><button type="button" id="togglePass">Show</button></div></label>
+      <button class="primary wide" id="loginBtn">Log in</button>
+    </form>
+    <div id="loginMsg" class="message"></div>
+  </div>
+</div>
+
+<div id="appView" class="hidden">
+<header class="topbar">
+  <div><div class="eyebrow">FLASH GEAR BD</div><h1>Admin Manager</h1></div>
+  <div class="top-actions"><span id="adminUser"></span><button class="ghost" id="logoutBtn">Logout</button></div>
+</header>
+<main>
+  <section id="dashboard" class="page active">
+    <div class="page-head"><div><h2>Dashboard</h2><p>Store overview and alerts.</p></div><button class="primary" id="refreshBtn">Refresh</button></div>
+    <div class="stats" id="stats"></div>
+    <div class="grid-2">
+      <div class="card"><h3>Recent Orders</h3><div id="recentOrders"></div></div>
+      <div class="card"><h3>Low / Out of Stock</h3><div id="stockAlerts"></div></div>
+    </div>
+  </section>
+
+  <section id="products" class="page">
+    <div class="page-head"><div><h2>Products</h2><p>Manage products, variants, images, pricing, profit and stock.</p></div><button class="primary" id="newProductBtn">+ Add Product</button></div>
+    <div class="toolbar"><input id="productSearch" placeholder="Search product, SKU, brand..."><select id="productStatusFilter"><option value="">All status</option><option>Published</option><option>Hidden</option><option>Draft</option><option>Archived</option></select></div>
+    <div id="productList"></div>
+  </section>
+
+  <section id="orders" class="page">
+    <div class="page-head"><div><h2>Orders</h2><p>Manage status, courier and tracking.</p></div><button class="secondary" id="refreshOrdersBtn">Refresh</button></div>
+    <div class="toolbar"><input id="orderSearch" placeholder="Order ID, customer or phone..."><select id="orderStatusFilter"><option value="">All statuses</option><option>Pending</option><option>Confirmed</option><option>Processing</option><option>Shipped</option><option>Under Shipment</option><option>Delivered</option><option>Cancelled</option><option>Returned</option><option>Refunded</option></select></div>
+    <div id="orderList"></div>
+  </section>
+
+  <section id="customers" class="page">
+    <div class="page-head"><div><h2>Customers</h2><p>Customer history and contact information.</p></div></div>
+    <div class="toolbar"><input id="customerSearch" placeholder="Search name, phone, email..."></div>
+    <div id="customerList"></div>
+  </section>
+
+  <section id="inventory" class="page">
+    <div class="page-head"><div><h2>Inventory</h2><p>Adjust stock by automatic SKU and monitor alerts.</p></div></div>
+    <div class="card"><div class="grid"><label>SKU<input id="stockSku" list="skuList" placeholder="Search or choose SKU"><datalist id="skuList"></datalist></label><label>Quantity change<input id="stockQty" type="number" placeholder="+10 or -2"></label></div><button class="primary" id="adjustStockBtn">Adjust Stock</button><div id="stockMsg" class="message"></div></div>
+    <div id="inventoryList"></div>
+  </section>
+
+  <section id="categories" class="page">
+    <div class="page-head"><div><h2>Categories</h2><p>Manage category names used by products.</p></div></div>
+    <div class="card"><div class="grid"><label>Category name<input id="categoryName"></label><label>Sort order<input id="categorySort" type="number" value="0"></label></div><label class="check"><input id="categoryActive" type="checkbox" checked> Active</label><button class="primary" id="saveCategoryBtn">Save Category</button></div>
+    <div id="categoryList"></div>
+  </section>
+
+  <section id="activity" class="page">
+    <div class="page-head"><div><h2>Activity Log</h2><p>Admin actions and order status history.</p></div><button class="secondary" id="refreshActivityBtn">Refresh</button></div>
+    <div id="activityList"></div>
+  </section>
+
+  <section id="settings" class="page">
+    <div class="page-head"><div><h2>Settings</h2><p>Store information and admin security.</p></div></div>
+    <div class="card"><h3>Store settings</h3><div id="settingsForm" class="grid"></div><button class="primary" id="saveSettingsBtn">Save Settings</button><div id="settingsMsg" class="message"></div></div>
+    <div class="card"><h3>Change admin password</h3><div class="grid"><label>Current password<input id="currentPassword" type="password"></label><label>New password<input id="newPassword" type="password" minlength="10"></label><label>Confirm new password<input id="confirmPassword" type="password"></label></div><button class="primary" id="changePasswordBtn">Change Password</button><div id="passwordMsg" class="message"></div></div>
+  </section>
+</main>
+
+<nav class="bottom-nav">
+  <button data-page="dashboard">⌂<span>Home</span></button>
+  <button data-page="products">▣<span>Products</span></button>
+  <button data-page="orders">🛒<span>Orders</span></button>
+  <button data-page="inventory">▤<span>Stock</span></button>
+  <button data-page="categories">⌘<span>Categories</span></button>
+  <button data-page="customers">♙<span>Customers</span></button>
+  <button data-page="activity">◷<span>Activity</span></button>
+  <button data-page="settings">⚙<span>Settings</span></button>
+</nav>
+</div>
+
+<div id="modal" class="modal hidden"><div class="modal-card"><button class="modal-close" id="closeModal">×</button><div id="modalBody"></div></div></div>
+<script src="/admin.js"></script>
+</body>
+</html>

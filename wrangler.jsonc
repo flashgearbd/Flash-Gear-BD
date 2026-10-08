@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "flash-gear-bd",
+  "main": "flash-gear-bd-worker.js",
+  "compatibility_date": "2026-10-04",
+  "assets": {
+    "directory": ".",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api", "/api/*", "/admin", "/admin/*", "/product/*", "/shop*", "/offers*", "/new*"],
+    "not_found_handling": "404-page"
+  }
+}

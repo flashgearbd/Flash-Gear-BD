@@ -11,14 +11,6 @@ export default {
     const url = new URL(request.url);
     if (request.method === 'OPTIONS') return corsResponse(request, env, new Response(null, {status:204}));
     if (url.pathname === '/api' || url.pathname === '/api/' || url.pathname.startsWith('/api/')) return handleApi(request, env, url);
-    if (url.pathname === '/admin' || url.pathname === '/admin/' || url.pathname === '/admin.html') {
-      const assetResponse = await env.ASSETS.fetch(new Request(new URL('/admin.html', url), request));
-      return withNoStore(assetResponse);
-    }
-    if (url.pathname === '/admin.js' || url.pathname === '/admin.css') {
-      const assetResponse = await env.ASSETS.fetch(new Request(new URL(url.pathname, url), request));
-      return withNoStore(assetResponse);
-    }
     if (url.pathname === '/shop' || url.pathname === '/offers' || url.pathname === '/new' || url.pathname.startsWith('/product/')) {
       return env.ASSETS.fetch(new Request(new URL('/index.html', url), request));
     }

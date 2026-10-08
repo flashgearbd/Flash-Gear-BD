@@ -80,3 +80,10 @@ Image uploads synchronize the currently typed variant fields before re-rendering
 - Deprecated/fake feature string scan
 - Image asset optimization
 - ZIP integrity validation before delivery
+
+## V1.1 stability update
+- Google Drive image URLs are normalized to googleusercontent/Drive thumbnail candidates in both frontend and Apps Script responses.
+- Product links use hash SPA routing while direct `/product/<id>` paths are routed to `index.html` by the Worker and `_redirects`.
+- Product detail waits for the live catalog before declaring a product missing.
+- Catalog loading/error states and null-safe product normalization prevent blank screens.
+- Apps Script returns structured versioned JSON and exposes authenticated `adminInventory` data for stock/pricing/status management.

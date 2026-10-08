@@ -39,6 +39,7 @@ function doPost(e){
       case 'adminData':return out(adminAuthAndData_(b.sessionToken));
       case 'adminOrders':return out(adminOrders_(b.sessionToken));
       case 'adminProducts':return out(adminProducts_(b.sessionToken));
+      case 'adminInventory':return out(adminInventory_(b.sessionToken));
       case 'adminActivity':return out(adminActivity_(b.sessionToken));
       case 'adminLogout':return out(adminLogout_(b));
       case 'adminChangePassword':return out(adminChangePassword_(b));
@@ -113,6 +114,39 @@ function createOrder_(b){
   }finally{lock.releaseLock();}
 }
 
+function driveFileId_(value){
+  const raw=String(value||'').trim(); if(!raw)return '';
+  const patterns=[
+    /drive\.google\.com\/file\/d\/([A-Za-z0-9_-]{10,})/i,
+    /drive\.google\.com\/open\?[^#]*\bid=([A-Za-z0-9_-]{10,})/i,
+    /drive\.google\.com\/uc\?[^#]*\bid=([A-Za-z0-9_-]{10,})/i,
+    /drive\.google\.com\/thumbnail\?[^#]*\bid=([A-Za-z0-9_-]{10,})/i,
+    /drive\.usercontent\.google\.com\/download\?[^#]*\bid=([A-Za-z0-9_-]{10,})/i,
+    /[?&](?:id|fileId)=([A-Za-z0-9_-]{10,})/i,
+    /lh\d+\.googleusercontent\.com\/d\/([A-Za-z0-9_-]{10,})/i
+  ];
+  for(const re of patterns){const m=raw.match(re);if(m&&m[1])return m[1];}
+  return /^[A-Za-z0-9_-]{20,}$/.test(raw)?raw:'';
+}
+function imageUrl_(value){
+  let raw=String(value||'').trim(); if(!raw)return '';
+  const fn=raw.match(/^=IMAGE\(\s*["']([^"']+)["']/i); if(fn)raw=fn[1].trim();
+  raw=raw.replace(/^['"]|['"]$/g,'').trim().replace(/&amp;/g,'&');
+  const id=driveFileId_(raw);
+  return id?'https://lh3.googleusercontent.com/d/'+encodeURIComponent(id)+'=w1600':raw;
+}
+function imageUrls_(value){
+  const raw=String(value||'').trim(),id=driveFileId_(raw),out=[];
+  const add=u=>{if(u&&!out.includes(u))out.push(u);};
+  if(id){
+    add('https://lh3.googleusercontent.com/d/'+encodeURIComponent(id)+'=w1600');
+    add('https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w1600');
+    add('https://drive.google.com/uc?export=view&id='+encodeURIComponent(id));
+    add('https://drive.usercontent.google.com/download?id='+encodeURIComponent(id)+'&export=view&confirm=t');
+  }else if(raw)add(imageUrl_(raw));
+  return out;
+}
+
 function products_(q){
   const ss=SpreadsheetApp.openById(CFG.SHEET_ID), rows=objects_(sheet_(ss,CFG.SHEETS.P)), status='published', query=String(q.q||'').toLowerCase(), cat=String(q.category||'').toLowerCase(), g={};
   const sales={};
@@ -121,9 +155,9 @@ function products_(q){
     const id=String(p['Product ID']||p.SKU||''); if(!id)return;
     if(!g[id])g[id]={id,name:String(p['Product Name']||''),category:String(p.Category||''),subcategory:String(p.Subcategory||''),brand:String(p.Brand||''),shortDescription:String(p['Short Description']||''),description:String(p.Description||''),featured:truth_(p.Featured),newArrival:truth_(p['New Arrival']),deal:truth_(p.Deal),variants:[]};
     const av=Math.max(0,num_(p.Stock)-num_(p.Reserved)), st=av<=0?'Out of Stock':av<=num_(p['Reorder Level'],CFG.REORDER)?'Low Stock':'In Stock', price=truth_(p.Deal)&&num_(p['Offer Price'])>0?num_(p['Offer Price']):num_(p['Selling Price']);
-    g[id].variants.push({sku:String(p.SKU||''),variantId:String(p['Variant ID']||p.SKU||''),variant:String(p.Variant||''),price,oldPrice:num_(p['Old Price']),stock:st,availableStock:av,image:String(p['Image 1 URL']||''),images:[p['Image 1 URL'],p['Image 2 URL'],p['Image 3 URL'],p['Image 4 URL']].filter(Boolean).map(String),salesCount:num_(sales[String(p.SKU||'')])});
+    g[id].variants.push({sku:String(p.SKU||''),variantId:String(p['Variant ID']||p.SKU||''),variant:String(p.Variant||''),price,oldPrice:num_(p['Old Price']),stock:st,availableStock:av,image:imageUrl_(p['Image 1 URL']),images:[p['Image 1 URL'],p['Image 2 URL'],p['Image 3 URL'],p['Image 4 URL']].filter(Boolean).flatMap(imageUrls_),salesCount:num_(sales[String(p.SKU||'')])});
   });
-  return {ok:true,products:Object.values(g)};
+  return {ok:true,version:CFG.VERSION,products:Object.values(g)};
 }
 function product_(id,sku){const a=products_({status:'Published'}).products.find(p=>sku?p.variants.some(v=>v.sku===sku):p.id===String(id||''));return a?{ok:true,product:a}:{ok:false,error:'Product not found'};}
 
@@ -197,7 +231,7 @@ function objects_(s){const v=s.getDataRange().getValues();if(!v.length)return[];
 function map_(s){const a=s.getRange(1,1,1,Math.max(1,s.getLastColumn())).getValues()[0],m={};a.forEach((x,i)=>{if(x)m[String(x).trim()]=i+1;});return m;}
 function sheet_(ss,name){const s=ss.getSheetByName(name);if(!s)throw Error('Sheet not found: '+name+'. Run setupStore() first.');return s;}
 function auth_(key){const expected=String(PropertiesService.getScriptProperties().getProperty('FGBD_API_KEY')||'').trim();const supplied=String(key||'').trim();if(!expected)throw Error('API key is not configured in Apps Script. Run setApiKey(secret) once in the Apps Script editor.');if(!supplied)throw Error('API key was not supplied by the API gateway.');if(supplied!==expected)throw Error('Unauthorized: API key mismatch.');}
-function out(x){return ContentService.createTextOutput(JSON.stringify(x)).setMimeType(ContentService.MimeType.JSON);}
+function out(x){const payload=(x&&typeof x==='object')?x:{ok:true,data:x};if(payload.ok===undefined)payload.ok=true;if(payload.version===undefined)payload.version=CFG.VERSION;return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON);}
 function log_(a,ok,msg,id,src){try{const ss=SpreadsheetApp.openById(CFG.SHEET_ID),s=ss.getSheetByName(CFG.SHEETS.L)||ss.insertSheet(CFG.SHEETS.L);if(!s.getLastRow())s.appendRow(H.API_Log);s.appendRow([new Date(),a,ok?'Yes':'No',msg,id||'',src||'']);}catch(_) {}}
 function num_(v,f=0){const n=Number(v);return Number.isFinite(n)?n:f;}
 function truth_(v){return v===true||['true','yes','1'].includes(String(v||'').toLowerCase().trim());}
@@ -288,10 +322,19 @@ function hashPassword_(password,salt){
 function adminAuthAndData_(token){const user=adminSession_(token);return Object.assign({ok:true,username:user},adminData_());}
 function adminProducts_(token){adminSession_(token);return {ok:true,products:adminProductsData_()};}
 function adminOrders_(token){adminSession_(token);return {ok:true,orders:adminOrdersData_()};}
+function adminInventory_(token){
+  adminSession_(token);
+  const rows=objects_(sheet_(SpreadsheetApp.openById(CFG.SHEET_ID),CFG.SHEETS.P));
+  return {ok:true,inventory:rows.map(r=>{
+    const stock=num_(r.Stock),reserved=num_(r.Reserved),available=Math.max(0,stock-reserved),reorder=num_(r['Reorder Level'],CFG.REORDER);
+    return {productId:String(r['Product ID']||''),productName:String(r['Product Name']||'Unnamed Product'),sku:String(r.SKU||''),variantId:String(r['Variant ID']||r.SKU||''),variant:String(r.Variant||''),stock,reserved,availableStock:available,reorderLevel:reorder,stockStatus:available<=0?'Out of Stock':available<=reorder?'Low Stock':'In Stock',sellingPrice:num_(r['Selling Price']),offerPrice:num_(r['Offer Price']),websiteStatus:String(r['Website Status']||'Published'),updatedAt:iso_(r['Updated At']||'')};
+  })};
+}
+
 function adminActivity_(token){adminSession_(token);return {ok:true,activity:adminActivityData_()};}
 
 function adminData_(){
-  return {dashboard:adminDashboard_(),products:adminProductsData_(),orders:adminOrdersData_(),customers:adminCustomersData_(),categories:adminCategoriesData_(),settings:settings_().settings,activity:adminActivityData_()};
+  return {version:CFG.VERSION,dashboard:adminDashboard_(),products:adminProductsData_(),orders:adminOrdersData_(),customers:adminCustomersData_(),categories:adminCategoriesData_(),settings:settings_().settings,activity:adminActivityData_()};
 }
 function adminDashboard_(){
   const ss=SpreadsheetApp.openById(CFG.SHEET_ID);
@@ -314,7 +357,7 @@ function adminProductsData_(){
     if(!g[id])g[id]={id,name:String(r['Product Name']||''),brand:String(r.Brand||''),category:String(r.Category||''),subcategory:String(r.Subcategory||''),shortDescription:String(r['Short Description']||''),description:String(r.Description||''),featured:truth_(r.Featured),newArrival:truth_(r['New Arrival']),deal:truth_(r.Deal),updatedAt:iso_(r['Updated At']||r['Created At']),variants:[]};
     const av=num_(r.Stock)-num_(r.Reserved);
     g[id].updatedAt=iso_(r['Updated At']||r['Created At'])||g[id].updatedAt;
-    g[id].variants.push({sku:String(r.SKU||''),variantId:String(r['Variant ID']||r.SKU||''),variant:String(r.Variant||''),costPrice:num_(r['Cost Price']),sellingPrice:num_(r['Selling Price']),oldPrice:num_(r['Old Price']),stock:num_(r.Stock),reserved:num_(r.Reserved),availableStock:av,reorderLevel:num_(r['Reorder Level'],CFG.REORDER),supplier:String(r.Supplier||''),offerPrice:num_(r['Offer Price']),websiteStatus:String(r['Website Status']||'Published'),images:[r['Image 1 URL'],r['Image 2 URL'],r['Image 3 URL'],r['Image 4 URL']].filter(Boolean).map(String)});
+    g[id].variants.push({sku:String(r.SKU||''),variantId:String(r['Variant ID']||r.SKU||''),variant:String(r.Variant||''),costPrice:num_(r['Cost Price']),sellingPrice:num_(r['Selling Price']),oldPrice:num_(r['Old Price']),stock:num_(r.Stock),reserved:num_(r.Reserved),availableStock:av,reorderLevel:num_(r['Reorder Level'],CFG.REORDER),supplier:String(r.Supplier||''),offerPrice:num_(r['Offer Price']),websiteStatus:String(r['Website Status']||'Published'),images:[r['Image 1 URL'],r['Image 2 URL'],r['Image 3 URL'],r['Image 4 URL']].filter(Boolean).flatMap(imageUrls_)});
   });
   return Object.values(g).sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0));
 }

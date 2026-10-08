@@ -38,6 +38,8 @@
   let cart = JSON.parse(localStorage.getItem("fgbd_cart") || "[]");
   let backendOnline = false;
   let liveProductsLoaded = false;
+  let catalogLoading = true;
+  let catalogError = "";
   let storeSettings = {
     "Shop Name":"Flash Gear BD", "Business Hours":"11 AM - 9 PM", "Shop Phone":"", "WhatsApp":"",
     "Email":"", "Address":"",
@@ -69,92 +71,97 @@
       ...options,
       headers: { "Content-Type": "application/json", ...(options.headers || {}) }
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || data.ok === false) throw new Error(data.error || "Request failed.");
+    const text=await response.text();
+    let data={};
+    try{data=text?JSON.parse(text):{};}catch(_){throw new Error(`API returned an invalid response (HTTP ${response.status}).`);}
+    if(!response.ok||data.ok===false)throw new Error(data.error||`Request failed (HTTP ${response.status}).`);
     return data;
   }
 
   function extractDriveFileId(value){
-    const patterns = [
-      /drive\.google\.com\/file\/d\/([A-Za-z0-9_-]+)/i,
-      /drive\.google\.com\/drive\/u\/\d+\/folders\/([A-Za-z0-9_-]+)/i,
-      /drive\.google\.com\/drive\/folders\/([A-Za-z0-9_-]+)/i,
+    const raw=String(value||'').trim();
+    if(!raw)return '';
+    const patterns=[
+      /drive\.google\.com\/file\/d\/([A-Za-z0-9_-]{10,})/i,
+      /drive\.google\.com\/open\?[^#]*\bid=([A-Za-z0-9_-]{10,})/i,
+      /drive\.google\.com\/uc\?[^#]*\bid=([A-Za-z0-9_-]{10,})/i,
+      /drive\.google\.com\/thumbnail\?[^#]*\bid=([A-Za-z0-9_-]{10,})/i,
+      /drive\.google\.com\/drive\/u\/\d+\/folders\/([A-Za-z0-9_-]{10,})/i,
+      /drive\.google\.com\/drive\/folders\/([A-Za-z0-9_-]{10,})/i,
+      /drive\.usercontent\.google\.com\/download\?[^#]*\bid=([A-Za-z0-9_-]{10,})/i,
       /[?&](?:id|fileId)=([A-Za-z0-9_-]{10,})/i,
-      /drive\.usercontent\.google\.com\/download\?id=([A-Za-z0-9_-]{10,})/i,
       /lh\d+\.googleusercontent\.com\/d\/([A-Za-z0-9_-]{10,})/i
     ];
-    for(const pattern of patterns){
-      const m = String(value || '').match(pattern);
-      if(m && m[1]) return m[1];
-    }
-    return /^[A-Za-z0-9_-]{20,}$/.test(String(value || '').trim()) ? String(value).trim() : '';
+    for(const pattern of patterns){const m=raw.match(pattern);if(m&&m[1])return m[1];}
+    return /^[A-Za-z0-9_-]{20,}$/.test(raw)?raw:'';
   }
 
   function normalizeImageUrl(url){
-    let value = String(url || '').trim();
-    if(!value) return '';
-    // Handle Sheets cells that contain IMAGE("url") or quoted URLs.
-    const imageFn = value.match(/^=IMAGE\(\s*["']([^"']+)["']/i);
-    if(imageFn) value = imageFn[1].trim();
-    value = value.replace(/^['"]|['"]$/g,'').trim().replace(/&amp;/g,'&');
-
-    // Keep normal web image URLs untouched.
-    if(/^https?:\/\//i.test(value) && !/drive\.google\.com|drive\.usercontent\.google\.com|googleusercontent\.com/i.test(value)) return value;
-
-    const id = extractDriveFileId(value);
-    if(id) return 'https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w1600';
+    let value=String(url||'').trim();
+    if(!value)return '';
+    const imageFn=value.match(/^=IMAGE\(\s*["']([^"']+)["']/i);
+    if(imageFn)value=imageFn[1].trim();
+    value=value.replace(/^['"]|['"]$/g,'').trim().replace(/&amp;/g,'&');
+    const id=extractDriveFileId(value);
+    if(id)return 'https://lh3.googleusercontent.com/d/'+encodeURIComponent(id)+'=w1600';
     return value;
   }
 
   function imageCandidates(url){
-    let value = String(url || '').trim();
-    if(!value) return [];
-    const primary = normalizeImageUrl(value);
-    const id = extractDriveFileId(value);
-    const out = [];
-    const add = u => { if(u && !out.includes(u)) out.push(u); };
-    add(primary);
+    const value=String(url||'').trim();
+    if(!value)return [];
+    const id=extractDriveFileId(value);
+    const out=[]; const add=u=>{if(u&&!out.includes(u))out.push(u);};
+    if(/^https?:\/\//i.test(value)&&!id)add(value);
     if(id){
       add('https://lh3.googleusercontent.com/d/'+encodeURIComponent(id)+'=w1600');
+      add('https://lh3.googleusercontent.com/d/'+encodeURIComponent(id)+'=w1200');
       add('https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w1600');
       add('https://drive.google.com/uc?export=view&id='+encodeURIComponent(id));
       add('https://drive.usercontent.google.com/download?id='+encodeURIComponent(id)+'&export=view&confirm=t');
-    }
+    }else if(/^https?:\/\//i.test(value)){add(value);}
     return out;
   }
 
   function normalizeLiveProducts(rows) {
-    return (rows || []).map(p => {
-      const variants = Array.isArray(p.variants) ? p.variants : [];
-      const v = variants[0] || { sku: "", variantId: "", variant: "", price: 0, oldPrice: 0, stock: "Out of Stock", image: "", images: [] };
+    return (Array.isArray(rows)?rows:[]).map(p=>{
+      const safe=p&&typeof p==='object'?p:{};
+      const variants=Array.isArray(safe.variants)?safe.variants:[];
+      const normalizedVariants=variants.map(v=>{const x=v&&typeof v==='object'?v:{};return {
+        sku:String(x.sku||''),variantId:String(x.variantId||x.sku||''),variant:String(x.variant||''),
+        price:Number(x.price)||0,oldPrice:Number(x.oldPrice)||0,
+        stock:String(x.stock||'Out of Stock'),availableStock:Math.max(0,Number(x.availableStock)||0),
+        image:normalizeImageUrl(x.image||''),images:(Array.isArray(x.images)?x.images:[]).map(normalizeImageUrl).filter(Boolean),
+        salesCount:Number(x.salesCount)||0
+      };});
+      const v=normalizedVariants[0]||{sku:'',variantId:'',variant:'',price:0,oldPrice:0,stock:'Out of Stock',availableStock:0,image:'',images:[]};
       return {
-        id: p.id, name: p.name, brand: p.brand, category: p.category, subcategory: p.subcategory,
-        price: Number(v.price || 0), oldPrice: Number(v.oldPrice || 0), stock: v.stock || "Out of Stock",
-        image: normalizeImageUrl(v.image || ""), images: (v.images || []).map(normalizeImageUrl), description: p.description || p.shortDescription || "",
-        shortDescription: p.shortDescription || "", variant: v.variant || "", sku: v.sku || "",
-        variantId: v.variantId || v.sku || "", variants, featured: !!p.featured, newArrival: !!p.newArrival, deal: !!p.deal
+        id:String(safe.id||safe.productId||v.sku||''),name:String(safe.name||'Unnamed Product'),brand:String(safe.brand||''),
+        category:String(safe.category||'Gadget & Accessories'),subcategory:String(safe.subcategory||''),
+        price:v.price,oldPrice:v.oldPrice,stock:v.stock,image:normalizeImageUrl(v.image||''),images:v.images,
+        description:String(safe.description||safe.shortDescription||''),shortDescription:String(safe.shortDescription||''),
+        variant:v.variant,sku:v.sku,variantId:v.variantId,variants:normalizedVariants.length?normalizedVariants:[v],
+        featured:Boolean(safe.featured),newArrival:Boolean(safe.newArrival),deal:Boolean(safe.deal)
       };
-    });
+    }).filter(p=>p.id);
   }
 
-  async function loadProductsFromApi() {
-    if (CFG.useMockData && !CFG.tryLiveData) return;
-    try {
-      const data = await apiRequest("/products");
-      if (data.products) {
-        products = normalizeLiveProducts(data.products);
-        const subs=[...new Set(products.map(p=>p.subcategory).filter(Boolean))];
-        if(subs.length) gadgetSubcategories=subs.map(x=>[x]);
-        backendOnline = true;
-        liveProductsLoaded = true;
-        refreshCartFromLiveCatalog();
-        if(!["#checkout","#cart"].includes(location.hash.split('?')[0])) render(true);
-      }
-    } catch (error) {
-      backendOnline = false;
-      liveProductsLoaded = false;
-      products = [];
-      if(!["#checkout","#cart"].includes(location.hash.split('?')[0])) render(true);
+  async function loadProductsFromApi(){
+    catalogLoading=true; catalogError='';
+    if(!["#checkout","#cart"].includes(location.hash.split('?')[0]))render(true);
+    try{
+      const data=await apiRequest('/products');
+      if(!data||!Array.isArray(data.products))throw new Error('Product catalog response is invalid.');
+      products=normalizeLiveProducts(data.products);
+      const subs=[...new Set(products.map(p=>p.subcategory).filter(Boolean))];
+      if(subs.length)gadgetSubcategories=subs.map(x=>[x]);
+      backendOnline=true; liveProductsLoaded=true; catalogLoading=false; catalogError='';
+      refreshCartFromLiveCatalog();
+      render(true);
+    }catch(error){
+      backendOnline=false; liveProductsLoaded=false; catalogLoading=false; catalogError=String(error?.message||'Unable to load products.');
+      products=[];
+      if(!["#checkout","#cart"].includes(location.hash.split('?')[0]))render(true);
     }
   }
 
@@ -341,7 +348,7 @@
     const disabled=view.stock==='Out of Stock'?'disabled':'';
     const discount=view.oldPrice&&Number(view.oldPrice)>Number(view.price)?Math.round((1-Number(view.price)/Number(view.oldPrice))*100):0;
     const key=productCartKey(view),qty=quickQtyValue(view),safeKey=escapeHtml(key);
-    return `<article class="product-card"><a href="/product/${encodeURIComponent(p.id)}" class="product-media">${productImage(view)}</a>${discount?`<span class="badge">-${discount}%</span>`:view.deal?`<span class="badge">DEAL</span>`:''}<div class="product-body"><small class="muted">${escapeHtml(view.brand||'Gadget')} · ${escapeHtml(view.category||'Accessories')}</small><a href="/product/${encodeURIComponent(p.id)}" class="product-name">${escapeHtml(view.name)}</a>${variants.length>1?`<select class="card-variant-select" aria-label="Choose variant" onchange="changeCardVariant('${escapeHtml(p.id)}',this.value)">${variants.map(x=>`<option value="${escapeHtml(x.sku)}" ${x.sku===selectedSku?'selected':''}>${escapeHtml(x.variant||x.sku||'Standard')} · ${money(x.price)}</option>`).join('')}</select>`:''}<div class="price-row"><strong>${money(view.price)}</strong>${view.oldPrice?`<del>${money(view.oldPrice)}</del>`:''}</div><span class="${stockClass(view.stock)}">${escapeHtml(view.stock)}</span><div class="quick-cart-row"><div class="quick-qty" aria-label="Quantity"><button type="button" ${disabled} onclick="changeQuickQty('${escapeHtml(view.id)}','${escapeHtml(view.sku||view.variantId||'')}',-1); return false;" aria-label="Decrease quantity">−</button><span data-quick-qty="${safeKey}">${qty}</span><button type="button" ${disabled} onclick="changeQuickQty('${escapeHtml(view.id)}','${escapeHtml(view.sku||view.variantId||'')}',1); return false;" aria-label="Increase quantity">+</button></div><button class="quick-add" ${disabled} onclick="addToCart('${escapeHtml(view.id)}','${escapeHtml(view.sku||view.variantId||'')}',quickQtyValueByKey('${safeKey}'))">${disabled?'Out of Stock':'🛒 Add'}</button></div></div></article>`;
+    return `<article class="product-card"><a href="#product/${encodeURIComponent(p.id)}" class="product-media">${productImage(view)}</a>${discount?`<span class="badge">-${discount}%</span>`:view.deal?`<span class="badge">DEAL</span>`:''}<div class="product-body"><small class="muted">${escapeHtml(view.brand||'Gadget')} · ${escapeHtml(view.category||'Accessories')}</small><a href="#product/${encodeURIComponent(p.id)}" class="product-name">${escapeHtml(view.name)}</a>${variants.length>1?`<select class="card-variant-select" aria-label="Choose variant" onchange="changeCardVariant('${escapeHtml(p.id)}',this.value)">${variants.map(x=>`<option value="${escapeHtml(x.sku)}" ${x.sku===selectedSku?'selected':''}>${escapeHtml(x.variant||x.sku||'Standard')} · ${money(x.price)}</option>`).join('')}</select>`:''}<div class="price-row"><strong>${money(view.price)}</strong>${view.oldPrice?`<del>${money(view.oldPrice)}</del>`:''}</div><span class="${stockClass(view.stock)}">${escapeHtml(view.stock)}</span><div class="quick-cart-row"><div class="quick-qty" aria-label="Quantity"><button type="button" ${disabled} onclick="changeQuickQty('${escapeHtml(view.id)}','${escapeHtml(view.sku||view.variantId||'')}',-1); return false;" aria-label="Decrease quantity">−</button><span data-quick-qty="${safeKey}">${qty}</span><button type="button" ${disabled} onclick="changeQuickQty('${escapeHtml(view.id)}','${escapeHtml(view.sku||view.variantId||'')}',1); return false;" aria-label="Increase quantity">+</button></div><button class="quick-add" ${disabled} onclick="addToCart('${escapeHtml(view.id)}','${escapeHtml(view.sku||view.variantId||'')}',quickQtyValueByKey('${safeKey}'))">${disabled?'Out of Stock':'🛒 Add'}</button></div></div></article>`;
   }
   function changeCardVariant(id,sku){selectedVariants[id]=sku;render(true);}
 
@@ -435,13 +442,15 @@
       <div class="searchbar"><input id="shopSearch" value="${escapeHtml(currentSearch)}" placeholder="Search products..." oninput="handleShopSearchInput(this.value)" aria-label="Search shop"><button type="button" onclick="handleShopSearchInput(document.getElementById('shopSearch').value)">⌕</button></div>
       <div class="chips"><button class="${currentCategory==='All'?'active':''}" onclick="setCategory('All')">All</button>${categories.map(([name,coming])=>`<button class="${currentCategory===name?'active':''}" onclick="setCategory('${escapeHtml(name).replace(/'/g,'&#39;')}')">${escapeHtml(name)}${coming?' · Coming Later':''}</button>`).join('')}</div>
       ${showGadgetSubcategories?`<div class="subcategory-panel"><b>Gadget & Accessories</b><span>Choose a category</span><div class="chips subchips">${gadgetSubcategories.map(([name])=>`<button onclick="setCategory('${escapeHtml(name).replace(/'/g,'&#39;')}')">${escapeHtml(name)}</button>`).join('')}</div></div>`:''}
-      ${isComingSoon?`<div class="coming-soon-card"><div class="coming-soon-icon">⚡</div><span class="eyebrow">COMING LATER</span><h2>We’re currently working on our ${escapeHtml(currentCategory.toLowerCase())} inventory.</h2><p>Until then, explore our latest gadgets & accessories.</p><a class="btn primary" href="#shop?category=Gadget%20%26%20Accessories">Explore Gadgets & Accessories</a></div>`:`<div class="shop-layout"><aside class="filter-panel"><b>Filter</b><label>Brand<select id="shopBrandFilter" onchange="handleShopFilter()"><option value="">All Brands</option>${brands.map(b=>`<option ${b===shopBrandFilter?'selected':''}>${escapeHtml(b)}</option>`).join('')}</select></label><label>Availability<select id="shopAvailabilityFilter" onchange="handleShopFilter()"><option value="">All</option><option ${shopAvailabilityFilter==='In Stock'?'selected':''}>In Stock</option><option ${shopAvailabilityFilter==='Low Stock'?'selected':''}>Low Stock</option></select></label></aside><section><div class="results-head"><span id="shopResultCount">${arr.length} product${arr.length===1?'':'s'}</span><select id="shopSort" onchange="handleShopFilter()"><option ${shopSort==='Recommended'?'selected':''}>Recommended</option><option ${shopSort==='Best Selling'?'selected':''}>Best Selling</option><option ${shopSort==='Price: Low to High'?'selected':''}>Price: Low to High</option><option ${shopSort==='Price: High to Low'?'selected':''}>Price: High to Low</option><option ${shopSort==='Newest'?'selected':''}>Newest</option></select></div><div id="shopResults" class="product-grid">${arr.length?arr.map(productCard).join(''):'<div class="empty"><h3>No products found</h3><p>Try another search, category or filter.</p></div>'}</div></section></div>`}
+      ${isComingSoon?`<div class="coming-soon-card"><div class="coming-soon-icon">⚡</div><span class="eyebrow">COMING LATER</span><h2>We’re currently working on our ${escapeHtml(currentCategory.toLowerCase())} inventory.</h2><p>Until then, explore our latest gadgets & accessories.</p><a class="btn primary" href="#shop?category=Gadget%20%26%20Accessories">Explore Gadgets & Accessories</a></div>`:`<div class="shop-layout"><aside class="filter-panel"><b>Filter</b><label>Brand<select id="shopBrandFilter" onchange="handleShopFilter()"><option value="">All Brands</option>${brands.map(b=>`<option ${b===shopBrandFilter?'selected':''}>${escapeHtml(b)}</option>`).join('')}</select></label><label>Availability<select id="shopAvailabilityFilter" onchange="handleShopFilter()"><option value="">All</option><option ${shopAvailabilityFilter==='In Stock'?'selected':''}>In Stock</option><option ${shopAvailabilityFilter==='Low Stock'?'selected':''}>Low Stock</option></select></label></aside><section><div class="results-head"><span id="shopResultCount">${arr.length} product${arr.length===1?'':'s'}</span><select id="shopSort" onchange="handleShopFilter()"><option ${shopSort==='Recommended'?'selected':''}>Recommended</option><option ${shopSort==='Best Selling'?'selected':''}>Best Selling</option><option ${shopSort==='Price: Low to High'?'selected':''}>Price: Low to High</option><option ${shopSort==='Price: High to Low'?'selected':''}>Price: High to Low</option><option ${shopSort==='Newest'?'selected':''}>Newest</option></select></div><div id="shopResults" class="product-grid">${catalogLoading?'<div class="loading-state"><div class="spinner"></div><h3>Loading products…</h3><p>Checking live inventory.</p></div>':arr.length?arr.map(productCard).join(''):'<div class="empty"><h3>No products found</h3><p>'+escapeHtml(catalogError||'Try another search, category or filter.')+'</p></div>'}</div></section></div>`}
       </main>${footer()}`;
   }
 
   function productPage(id) {
-    const p = products.find(x => x.id === id);
-    if (!p) return `${header()}<main class="page"><div class="empty"><h2>Product not found</h2><p>This product link is invalid or the product is no longer published.</p><a class="btn primary" href="#shop">Back to Shop</a></div></main>${footer()}`;
+    const wanted=decodeURIComponent(String(id||''));
+    const p=products.find(x=>String(x.id)===wanted);
+    if(!p&&catalogLoading)return `${header()}<main class="page narrow"><div class="loading-state"><div class="spinner"></div><h2>Loading product…</h2><p>Please wait while we load the live inventory.</p></div></main>${footer()}`;
+    if(!p)return `${header()}<main class="page"><div class="empty"><h2>Product not found</h2><p>${escapeHtml(catalogError||'This product is unavailable or no longer published.')}</p><a class="btn primary" href="#shop">Back to Shop</a></div></main>${footer()}`;
     const recent=JSON.parse(localStorage.getItem("fgbd_recent")||"[]").filter(x=>String(x)!==String(p.id));recent.unshift(p.id);localStorage.setItem("fgbd_recent",JSON.stringify(recent.slice(0,8)));
     const variants = Array.isArray(p.variants) && p.variants.length ? p.variants : [{ sku: p.sku || "", variantId: p.variantId || p.sku || "", variant: p.variant || "", price: p.price, oldPrice: p.oldPrice, stock: p.stock, image: p.image, images: p.images || [] }];
     const selectedSku = selectedVariants[p.id] || variants[0].sku;
@@ -992,8 +1001,13 @@
     const savedScrollY = preserveScroll ? window.scrollY : 0;
     const cleanPath=location.pathname.replace(/^\/+|\/+$/g,'');
     const cleanQuery=location.search.replace(/^\?/,'');
-    const cleanRoute=cleanPath.startsWith('product/')?'product/'+decodeURIComponent(cleanPath.slice(8)):cleanPath;
-    const hash = cleanRoute && cleanRoute!=='index.html' ? cleanRoute+(cleanQuery?'?'+cleanQuery:'') : (location.hash.replace(/^#/, "") || "home");
+    let cleanRoute=cleanPath.startsWith('product/')?'product/'+decodeURIComponent(cleanPath.slice(8)):cleanPath;
+    if((!cleanRoute||cleanRoute==='index.html')&&cleanQuery){
+      const directParams=new URLSearchParams(cleanQuery);
+      if(directParams.get('id'))cleanRoute='product/'+decodeURIComponent(directParams.get('id'));
+      else if(directParams.get('route'))cleanRoute=String(directParams.get('route')).replace(/^\/+/, '');
+    }
+    const hash = cleanRoute && cleanRoute!=='index.html' ? cleanRoute+(cleanQuery&&!/^product\//.test(cleanRoute)?'?'+cleanQuery:'') : (location.hash.replace(/^#/, "") || "home");
     const [path, query] = hash.split("?");
     let html = "";
     if (path === "home") { currentCollection="all"; html = homePage(); }

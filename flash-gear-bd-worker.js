@@ -2,7 +2,7 @@
 const DEFAULT_ORIGIN = 'https://flash-gear-bd.fgbd.workers.dev';
 const RATE = new Map();
 const PUBLIC_GET_ACTIONS = new Set(['health','products','product','trackOrder','settings']);
-const ADMIN_ACTIONS = new Set(['adminLogin','adminLogout','adminChangePassword','adminData','adminOrders','adminProducts','adminActivity','adminProductSave','adminProductDelete','adminOrderStatus','adminCourier','adminStock','adminCategorySave','adminCategoryDelete','adminSettingsSave','adminImageUpload','adminImageBatchUpload']);
+const ADMIN_ACTIONS = new Set(['adminLogin','adminLogout','adminChangePassword','adminData','adminOrders','adminInventory','adminProducts','adminActivity','adminProductSave','adminProductDelete','adminOrderStatus','adminCourier','adminStock','adminCategorySave','adminCategoryDelete','adminSettingsSave','adminImageUpload','adminImageBatchUpload']);
 const PUBLIC_POST_ACTIONS = new Set(['createOrder']);
 const MUTATION_ACTIONS = new Set(['updateOrderStatus','updateCourier','adjustStock']);
 
@@ -19,8 +19,10 @@ export default {
     if (url.pathname === '/admin' || url.pathname === '/admin/') {
       return env.ASSETS.fetch(new Request(new URL('/admin.html', url), request));
     }
-    if (url.pathname === '/shop' || url.pathname === '/offers' || url.pathname === '/new' || url.pathname.startsWith('/product/')) {
-      return env.ASSETS.fetch(new Request(new URL('/index.html', url), request));
+    if (url.pathname === '/shop' || url.pathname === '/offers' || url.pathname === '/new' || url.pathname === '/product' || url.pathname.startsWith('/product/')) {
+      const target = new URL('/index.html', url);
+      target.search = url.search;
+      return env.ASSETS.fetch(new Request(target, request));
     }
     return env.ASSETS.fetch(request);
   }

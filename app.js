@@ -55,30 +55,53 @@
     return data;
   }
 
+  function extractDriveFileId(value){
+    const patterns = [
+      /drive\.google\.com\/file\/d\/([A-Za-z0-9_-]+)/i,
+      /drive\.google\.com\/drive\/u\/\d+\/folders\/([A-Za-z0-9_-]+)/i,
+      /drive\.google\.com\/drive\/folders\/([A-Za-z0-9_-]+)/i,
+      /[?&](?:id|fileId)=([A-Za-z0-9_-]{10,})/i,
+      /drive\.usercontent\.google\.com\/download\?id=([A-Za-z0-9_-]{10,})/i,
+      /lh\d+\.googleusercontent\.com\/d\/([A-Za-z0-9_-]{10,})/i
+    ];
+    for(const pattern of patterns){
+      const m = String(value || '').match(pattern);
+      if(m && m[1]) return m[1];
+    }
+    return /^[A-Za-z0-9_-]{20,}$/.test(String(value || '').trim()) ? String(value).trim() : '';
+  }
+
   function normalizeImageUrl(url){
-    let value=String(url||'').trim();
+    let value = String(url || '').trim();
     if(!value) return '';
     // Handle Sheets cells that contain IMAGE("url") or quoted URLs.
-    const imageFn=value.match(/^=IMAGE\(\s*[\"']([^\"']+)[\"']/i);
-    if(imageFn) value=imageFn[1].trim();
-    value=value.replace(/^['\"]|['\"]$/g,'').trim();
-    value=value.replace(/&amp;/g,'&');
+    const imageFn = value.match(/^=IMAGE\(\s*["']([^"']+)["']/i);
+    if(imageFn) value = imageFn[1].trim();
+    value = value.replace(/^['"]|['"]$/g,'').trim().replace(/&amp;/g,'&');
 
-    // Google Drive URLs appear in several formats depending on how they were copied.
-    // Convert every Drive file URL to a public thumbnail URL so the browser can render it reliably.
-    const drivePatterns=[
-      /drive\.google\.com\/file\/d\/([A-Za-z0-9_-]+)/i,
-      /drive\.google\.com\/(?:open|uc|thumbnail)\?(?:[^#]*&)?id=([A-Za-z0-9_-]+)/i,
-      /drive\.google\.com\/(?:uc)\?export=(?:view|download)&id=([A-Za-z0-9_-]+)/i,
-      /drive\.google\.com\/drive\/folders\/([A-Za-z0-9_-]+)/i
-    ];
-    for(const pattern of drivePatterns){
-      const match=value.match(pattern);
-      if(match && match[1]) return 'https://drive.google.com/thumbnail?id='+encodeURIComponent(match[1])+'&sz=w1600';
-    }
-    // A bare Google Drive file ID is also accepted.
-    if(/^[A-Za-z0-9_-]{20,}$/.test(value)) return 'https://drive.google.com/thumbnail?id='+encodeURIComponent(value)+'&sz=w1600';
+    // Keep normal web image URLs untouched.
+    if(/^https?:\/\//i.test(value) && !/drive\.google\.com|drive\.usercontent\.google\.com|googleusercontent\.com/i.test(value)) return value;
+
+    const id = extractDriveFileId(value);
+    if(id) return 'https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w1600';
     return value;
+  }
+
+  function imageCandidates(url){
+    let value = String(url || '').trim();
+    if(!value) return [];
+    const primary = normalizeImageUrl(value);
+    const id = extractDriveFileId(value);
+    const out = [];
+    const add = u => { if(u && !out.includes(u)) out.push(u); };
+    add(primary);
+    if(id){
+      add('https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w1600');
+      add('https://drive.google.com/uc?export=view&id='+encodeURIComponent(id));
+      add('https://drive.usercontent.google.com/download?id='+encodeURIComponent(id)+'&export=view&confirm=t');
+      add('https://lh3.googleusercontent.com/d/'+encodeURIComponent(id)+'=w1600');
+    }
+    return out;
   }
 
   function normalizeLiveProducts(rows) {
@@ -137,11 +160,19 @@
     const src = normalizeImageUrl(p.image || (p.images || [])[0] || "");
     const fallback = `<span class="product-placeholder ${large ? "large" : ""}" hidden><span>⚡</span><small>${escapeHtml(p.category || "Product")}</small></span>`;
     if (!src) return `<span class="product-image-fallback">${fallback.replace(' hidden','')}</span>`;
-    return `<span class="product-image-wrap"><img src="${escapeHtml(src)}" loading="lazy" decoding="async" alt="${escapeHtml(p.name)}" onerror="handleImageError(this)">${fallback}</span>`;
+    return `<span class="product-image-wrap"><img src="${escapeHtml(src)}" loading="lazy" decoding="async" alt="${escapeHtml(p.name)}" onerror="handleImageError(this)" data-image-candidates="${escapeHtml(JSON.stringify(imageCandidates(src)))}">${fallback}</span>`;
   }
 
   function handleImageError(img) {
     if (!img) return;
+    let candidates = [];
+    try { candidates = JSON.parse(img.getAttribute("data-image-candidates") || "[]"); } catch (_) {}
+    const current = img.getAttribute("src") || "";
+    const next = candidates.find(u => u && u !== current);
+    if (next) {
+      img.setAttribute("src", next);
+      return;
+    }
     img.onerror = null;
     img.style.display = "none";
     const fallback = img.nextElementSibling;
@@ -869,7 +900,8 @@
     track.addEventListener("touchstart", () => {}, {passive:true});
   }
 
-  function render() {
+  function render(preserveScroll = true) {
+    const savedScrollY = preserveScroll ? window.scrollY : 0;
     const hash = location.hash.replace(/^#/, "") || "home";
     const [path, query] = hash.split("?");
     let html = "";
@@ -902,6 +934,9 @@
     if (path === "home") initHomeSliders();
     else stopHomeSliders();
     if (path === "checkout") validateCheckout();
+    if (preserveScroll) {
+      requestAnimationFrame(() => window.scrollTo({top: savedScrollY, left: 0, behavior: "auto"}));
+    }
   }
 
   window.addToCart = addToCart;
@@ -928,7 +963,7 @@
   window.validateCheckout = validateCheckout;
   window.validateCheckoutField = validateCheckoutField;
 
-  window.addEventListener("hashchange", () => { window.scrollTo({top:0, behavior:"auto"}); render(); });
-  render();
+  window.addEventListener("hashchange", () => { window.scrollTo({top:0, left:0, behavior:"auto"}); render(false); });
+  render(false);
   loadProductsFromApi();
 })();

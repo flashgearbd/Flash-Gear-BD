@@ -1,4 +1,4 @@
-# Flash Gear BD — V1.0.28
+# Flash Gear BD — V1.0.29
 
 Customer website update based on V1.0.26.
 
@@ -19,3 +19,11 @@ Changes:
 - Fixed image frames across product cards, sliders, search suggestions, cart, thumbnails, and product detail.
 - Product images use contain positioning and blend with the site background frame.
 - Backend/authentication baseline remains V1.0.23.
+
+
+## V1.0.29 fixes
+- Preserve scroll position during non-navigation re-renders to prevent bottom-to-top bounce-back.
+- Reset scroll only on real hash navigation.
+- Added multiple Google Drive image URL candidates and retry-on-error image loading.
+- Supports Drive file/open/uc/thumbnail URLs, Drive IDs, googleusercontent URLs, and IMAGE("URL") cells.
+- Preserves fixed image frames and blended backgrounds from V1.0.28.

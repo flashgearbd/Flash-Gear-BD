@@ -123,16 +123,20 @@
     try {
       const data = await apiRequest("/products");
       if (data.products && data.products.length) {
+        const currentHash = location.hash;
+        const scrollY = window.scrollY;
         products = normalizeLiveProducts(data.products);
         backendOnline = true;
         liveProductsLoaded = true;
-        render();
+        if(currentHash === "#checkout" || currentHash === "#cart") return;
+        render(true);
+        requestAnimationFrame(() => window.scrollTo({top:scrollY,left:0,behavior:"auto"}));
       }
     } catch (error) {
       backendOnline = false;
       liveProductsLoaded = false;
       products = [];
-      render();
+      if(location.hash !== "#checkout" && location.hash !== "#cart") { const y=window.scrollY; render(true); requestAnimationFrame(()=>window.scrollTo({top:y,left:0,behavior:"auto"})); }
     }
   }
   let currentSearch = "";
@@ -483,7 +487,7 @@
           <label data-field="district">District *<select id="district" onchange="handleCheckoutInput(event)" disabled><option value="">Select Division First</option></select></label>
         </div>
         <label data-field="address">Full Delivery Address *<textarea id="address" placeholder="House/Flat, Road, Area, Landmark"></textarea></label>
-        <label data-field="note">Delivery Note <small>(Optional)</small><textarea id="note" placeholder="Any special instructions..."></textarea></label>
+        <input id="website" name="website" type="text" tabindex="-1" autocomplete="off" style="position:absolute;left:-10000px;width:1px;height:1px;opacity:0" aria-hidden="true"><label data-field="note">Delivery Note <small>(Optional)</small><textarea id="note" placeholder="Any special instructions..."></textarea></label>
         <h2>Payment Method</h2>
         <div class="payment-options">
           <label class="payment"><input type="radio" name="payment" value="Cash on Delivery" checked><span class="payment-icon">💵</span><b>Cash on Delivery</b><small>Pay when you receive the product.</small></label>
@@ -781,6 +785,7 @@
       district: document.getElementById("district").value,
       address: document.getElementById("address").value.trim(),
       note: document.getElementById("note").value.trim(),
+      website: document.getElementById("website")?.value || "",
       payment: document.querySelector('input[name="payment"]:checked')?.value || "Cash on Delivery",
       idempotencyKey: (crypto.randomUUID ? crypto.randomUUID() : `fg-${Date.now()}-${Math.random().toString(16).slice(2)}`),
       items: cart.map(item => ({ productId: item.id, sku: item.sku || "", qty: Number(item.qty) }))

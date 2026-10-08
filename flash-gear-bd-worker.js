@@ -1,184 +1,72 @@
-/**
- * FLASH GEAR BD — Cloudflare Worker API Gateway
- * FGBD V1.0.23
- *
- * Website -> Cloudflare Worker -> Google Apps Script -> Google Sheets
- *
- * Cloudflare secrets:
- *   APPS_SCRIPT_URL = deployed Google Apps Script Web App URL
- *   FGBD_API_KEY    = same secret stored in Apps Script Script Properties
- */
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type'
-};
+/** FLASH GEAR BD — Cloudflare Worker API Gateway — V1.0.30 */
+const DEFAULT_ORIGIN = 'https://flash-gear-bd.fgbd.workers.dev';
+const RATE = new Map();
+const PUBLIC_GET_ACTIONS = new Set(['health','products','product','trackOrder','settings']);
+const ADMIN_ACTIONS = new Set(['adminLogin','adminLogout','adminChangePassword','adminData','adminOrders','adminProducts','adminActivity','adminProductSave','adminProductDelete','adminOrderStatus','adminCourier','adminStock','adminCategorySave','adminCategoryDelete','adminSettingsSave','adminImageUpload','adminImageBatchUpload']);
+const PUBLIC_POST_ACTIONS = new Set(['createOrder']);
+const MUTATION_ACTIONS = new Set(['updateOrderStatus','updateCourier','adjustStock']);
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: corsHeaders });
-    }
-
-    if (url.pathname === '/api' || url.pathname === '/api/' || url.pathname.startsWith('/api/')) {
-      return handleApi(request, env, url);
-    }
-
+    if (request.method === 'OPTIONS') return corsResponse(request, env, new Response(null, {status:204}));
+    if (url.pathname === '/api' || url.pathname === '/api/' || url.pathname.startsWith('/api/')) return handleApi(request, env, url);
     if (url.pathname === '/admin' || url.pathname === '/admin/' || url.pathname === '/admin.html') {
-      const adminUrl = new URL('/admin.html', url);
-      const adminRequest = new Request(adminUrl.toString(), {
-        method: 'GET',
-        headers: request.headers
-      });
-      return env.ASSETS.fetch(adminRequest);
+      return env.ASSETS.fetch(new Request(new URL('/admin.html', url), request));
     }
-
     return env.ASSETS.fetch(request);
   }
 };
 
-async function handleApi(request, env, url) {
-  const apiKey = normalizeKey(env.FGBD_API_KEY);
-  const appsScriptUrl = String(env.APPS_SCRIPT_URL || '').trim();
-  if (!appsScriptUrl || !apiKey) {
-    return json({ ok: false, error: 'Backend is not configured yet.' }, 503);
+function allowedOrigin(request, env){
+  const origin = request.headers.get('Origin');
+  if (!origin) return true;
+  const configured = String(env.PUBLIC_ORIGIN || DEFAULT_ORIGIN).replace(/\/$/,'');
+  return origin === configured;
+}
+function corsHeaders(request, env){
+  const origin = request.headers.get('Origin');
+  const configured = String(env.PUBLIC_ORIGIN || DEFAULT_ORIGIN).replace(/\/$/,'');
+  return {'Access-Control-Allow-Origin': origin && origin === configured ? origin : configured,'Vary':'Origin','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'Content-Type','Access-Control-Max-Age':'600'};
+}
+function corsResponse(request, env, response){const h=new Headers(response.headers);Object.entries(corsHeaders(request,env)).forEach(([k,v])=>h.set(k,v));return new Response(response.body,{status:response.status,headers:h});}
+
+function rateLimit(request, key, limit=20, windowMs=60000){
+  const now=Date.now(); const ip=request.headers.get('CF-Connecting-IP') || 'unknown';
+  const k=key+':'+ip; const old=RATE.get(k)||[]; const fresh=old.filter(t=>now-t<windowMs); if(fresh.length>=limit)return false; fresh.push(now); RATE.set(k,fresh); if(RATE.size>2000) RATE.delete(RATE.keys().next().value); return true;
+}
+async function handleApi(request, env, url){
+  if(!allowedOrigin(request,env)) return json({ok:false,error:'Origin not allowed.'},403,request,env);
+  const action=url.searchParams.get('action') || url.pathname.replace(/^\/api\/?/,'').replace(/\/$/,'') || 'health';
+  if(request.method==='GET' && !PUBLIC_GET_ACTIONS.has(action) && !ADMIN_ACTIONS.has(action)) return json({ok:false,error:'Action not available publicly.'},403,request,env);
+  if(request.method==='POST' && MUTATION_ACTIONS.has(action)) return json({ok:false,error:'Direct mutation endpoint is disabled. Use an authenticated admin session.'},403,request,env);
+  if(action==='createOrder' && !rateLimit(request,'order',12,60000)) return json({ok:false,error:'Too many order attempts. Please wait a moment and try again.'},429,request,env);
+  if(action==='adminLogin' && !rateLimit(request,'login',8,900000)) return json({ok:false,error:'Too many login attempts from this network. Please wait and try again.'},429,request,env);
+  const appsScriptUrl=String(env.APPS_SCRIPT_URL||'').trim(), apiKey=String(env.FGBD_API_KEY||'').trim();
+  if(!appsScriptUrl||!apiKey)return json({ok:false,error:'Backend is not configured yet.'},503,request,env);
+  let body={};
+  if(request.method==='POST'){
+    try{body=await request.json();}catch(_){return json({ok:false,error:'Invalid JSON request body.'},400,request,env);}
+  }else{
+    url.searchParams.forEach((v,k)=>{if(k!=='action')body[k]=v;});
   }
-
-  const pathAction = url.pathname.replace(/^\/api\/?/, '').replace(/\/$/, '');
-  const action = url.searchParams.get('action') || pathAction || 'health';
-  const target = new URL(appsScriptUrl);
-  target.searchParams.set('action', action);
-  // Keep the key in the query string as well as the POST body. This is important
-  // for Google Apps Script web-app redirects, where the body may not survive a redirect.
-  target.searchParams.set('apiKey', apiKey);
-
-  try {
-    if (request.method === 'GET') {
-      url.searchParams.forEach((value, key) => {
-        if (key !== 'action') target.searchParams.set(key, value);
-      });
-      const upstream = await fetchPreservingMethod(target, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' }
-      });
-      return await proxyResponse(upstream, action);
-    }
-
-    if (request.method === 'POST') {
-      const raw = await request.text();
-      let body = {};
-      try {
-        body = raw ? JSON.parse(raw) : {};
-      } catch (_) {
-        return json({ ok: false, error: 'Invalid JSON request body.' }, 400);
-      }
-      body.apiKey = apiKey;
-      body.action = body.action || action;
-      target.searchParams.set('action', body.action);
-
-      // Google Apps Script Web Apps can return an HTML Google wrapper for a
-      // POST response when the request crosses the script.google.com ->
-      // googleusercontent.com boundary. Admin login is the one request that
-      // must be able to return a clean JSON response before a session exists.
-      // For that request only, send the credentials from this Worker to the
-      // Apps Script doGet endpoint. The browser still sends its credentials
-      // to Cloudflare using POST, so credentials are never exposed in the
-      // website URL. The Worker-to-Google hop remains HTTPS.
-      if (String(body.action) === 'adminLogin') {
-        target.searchParams.set('username', String(body.username || ''));
-        target.searchParams.set('password', String(body.password || ''));
-        const upstream = await fetch(target.toString(), {
-          method: 'GET',
-          headers: { 'Accept': 'application/json' },
-          redirect: 'follow'
-        });
-        return await proxyResponse(upstream, body.action);
-      }
-
-      const upstream = await fetchPreservingMethod(target, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(body)
-      });
-      return await proxyResponse(upstream, body.action);
-    }
-
-    return json({ ok: false, error: 'Method not allowed.' }, 405);
-  } catch (error) {
-    return json({
-      ok: false,
-      error: 'Backend request failed.',
-      detail: String(error && error.message || error)
-    }, 502);
+  body.action=String(body.action||action); body.apiKey=apiKey;
+  if(body.action==='createOrder' && String(body.website||'').trim()) return json({ok:false,error:'Order request rejected.'},400,request,env);
+  // Public GET product responses are cached at the Worker edge for 30 seconds.
+  if(request.method==='GET' && body.action==='products'){
+    const cacheKey=new Request(new URL('/api/products?'+new URLSearchParams(Object.fromEntries(Object.entries(body).filter(([k])=>k!=='apiKey'))),url.origin),{method:'GET'});
+    const cached=await caches.default.match(cacheKey); if(cached)return corsResponse(request,env,cached);
+    const result=await callAppsScript(appsScriptUrl,body); const response=json(result.data,result.status,request,env,30); await caches.default.put(cacheKey,response.clone()); return response;
   }
+  const result=await callAppsScript(appsScriptUrl,body);
+  return json(result.data,result.status,request,env);
 }
-
-function normalizeKey(value) {
-  return String(value || '').trim();
+async function callAppsScript(baseUrl, body){
+  const target=new URL(baseUrl); // Secrets and credentials stay in the POST body, not URLs.
+  const upstream=await fetch(target.toString(),{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(body),redirect:'follow'});
+  const type=String(upstream.headers.get('content-type')||''); let text=String(await upstream.text()||'').replace(/^\uFEFF/,'').trim(); let data;
+  try{data=text?JSON.parse(text):{};}catch(_){return {status:502,data:{ok:false,error:`Backend returned an invalid response for ${body.action}.`,detail:text.replace(/\s+/g,' ').slice(0,500),upstreamStatus:upstream.status,upstreamContentType:type||'unknown'}};}
+  if(upstream.status===401||String(data.error||'').toLowerCase()==='unauthorized')return {status:401,data:{ok:false,error:'Backend authorization failed.'}};
+  return {status:upstream.status,data};
 }
-
-async function fetchPreservingMethod(target, init, maxRedirects = 5) {
-  // Google Apps Script Web Apps commonly return a 302 after executing the
-  // request and place the actual ContentService JSON at the redirect target.
-  // Let the Cloudflare runtime follow that redirect using standard Fetch
-  // semantics. For 301/302/303, Fetch changes POST -> GET after the POST has
-  // already executed, which is exactly what the Apps Script ContentService
-  // response endpoint expects.
-  //
-  // We keep this helper small and use redirect:'follow' rather than manual
-  // redirect handling because Cloudflare may expose cross-origin redirect
-  // responses differently when redirect:'manual' is used.
-  const options = { ...init, redirect: 'follow' };
-  const response = await fetch(target.toString(), options);
-  return response;
-}
-
-async function proxyResponse(upstream, action) {
-  const contentType = String(upstream.headers.get('content-type') || '');
-  let text = await upstream.text();
-  text = String(text || '').replace(/^\uFEFF/, '').trim();
-
-  let data;
-  try {
-    data = text ? JSON.parse(text) : {};
-  } catch (_) {
-    const snippet = text.replace(/\s+/g, ' ').trim().slice(0, 500);
-    return json({
-      ok: false,
-      error: `Backend returned an invalid response for ${action}.`,
-      detail: snippet || `Empty response. HTTP ${upstream.status}.`,
-      upstreamStatus: upstream.status,
-      upstreamContentType: contentType || 'unknown'
-    }, 502);
-  }
-
-  // Give the browser a useful message when the upstream explicitly rejects auth.
-  if (upstream.status === 401 || String(data.error || '').trim().toLowerCase() === 'unauthorized') {
-    return json({
-      ok: false,
-      error: 'Backend authorization failed.',
-      detail: 'Cloudflare reached Google Apps Script, but the API key was rejected. Verify FGBD_API_KEY in both services and redeploy the Apps Script Web App and Worker.',
-      upstreamStatus: upstream.status,
-      upstreamContentType: contentType || 'unknown'
-    }, 401);
-  }
-
-  return json(data, upstream.status);
-}
-
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      ...corsHeaders,
-      'Cache-Control': 'no-store, no-cache, must-revalidate'
-    }
-  });
-}
+function json(data,status,request,env,cacheSeconds=0){const h=new Headers({'Content-Type':'application/json; charset=utf-8',...corsHeaders(request,env)});h.set('Cache-Control',cacheSeconds?`public, max-age=${cacheSeconds}`:'no-store, no-cache, must-revalidate');return new Response(JSON.stringify(data),{status,headers:h});}

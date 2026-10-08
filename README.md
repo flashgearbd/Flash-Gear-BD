@@ -1,4 +1,4 @@
-# Flash Gear BD — V1.0.29
+# Flash Gear BD — V1.0.30
 
 Customer website update based on V1.0.26.
 
@@ -21,9 +21,20 @@ Changes:
 - Backend/authentication baseline remains V1.0.23.
 
 
-## V1.0.29 fixes
+## V1.0.30 fixes
 - Preserve scroll position during non-navigation re-renders to prevent bottom-to-top bounce-back.
 - Reset scroll only on real hash navigation.
 - Added multiple Google Drive image URL candidates and retry-on-error image loading.
 - Supports Drive file/open/uc/thumbnail URLs, Drive IDs, googleusercontent URLs, and IMAGE("URL") cells.
 - Preserves fixed image frames and blended backgrounds from V1.0.28.
+
+
+## V1.0.30 security baseline
+- Static website files are served only from `public/`; source/config files remain outside the public asset directory.
+- Direct order-status/courier/stock mutation endpoints are disabled; admin session endpoints are required.
+- Public catalog is Published-only.
+- Available Stock is derived as Stock minus Reserved.
+- Checkout has Worker rate limiting and a honeypot.
+- CORS is restricted to PUBLIC_ORIGIN (defaults to the Worker origin).
+- Worker-to-Apps-Script API credentials are sent in POST bodies rather than URLs.
+- Product saving uses a script lock and preserves live stock for existing variants.

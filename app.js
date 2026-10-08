@@ -115,10 +115,10 @@
     const add = u => { if(u && !out.includes(u)) out.push(u); };
     add(primary);
     if(id){
+      add('https://lh3.googleusercontent.com/d/'+encodeURIComponent(id)+'=w1600');
       add('https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w1600');
       add('https://drive.google.com/uc?export=view&id='+encodeURIComponent(id));
       add('https://drive.usercontent.google.com/download?id='+encodeURIComponent(id)+'&export=view&confirm=t');
-      add('https://lh3.googleusercontent.com/d/'+encodeURIComponent(id)+'=w1600');
     }
     return out;
   }

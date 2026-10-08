@@ -12,7 +12,11 @@
       "/api",
       "/api/*",
       "/admin",
-      "/admin/"
+      "/admin/",
+      "/product/*",
+      "/shop",
+      "/offers",
+      "/new"
     ],
     "not_found_handling": "404-page"
   }

@@ -70,12 +70,41 @@ async function handleApi(request, env, url){
   return json(result.data,result.status,request,env);
 }
 async function callAppsScript(baseUrl, body){
-  const target=new URL(baseUrl); // Secrets and credentials stay in the POST body, not URLs.
-  const upstream=await fetch(target.toString(),{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(body),redirect:'follow'});
-  const type=String(upstream.headers.get('content-type')||''); let text=String(await upstream.text()||'').replace(/^\uFEFF/,'').trim(); let data;
-  try{data=text?JSON.parse(text):{};}catch(_){return {status:502,data:{ok:false,error:`Backend returned an invalid response for ${body.action}.`,detail:text.replace(/\s+/g,' ').slice(0,500),upstreamStatus:upstream.status,upstreamContentType:type||'unknown'}};}
-  if(upstream.status===401||String(data.error||'').toLowerCase()==='unauthorized')return {status:401,data:{ok:false,error:'Backend authorization failed.'}};
-  return {status:upstream.status,data};
+  // Google Apps Script web apps commonly issue a redirect before returning ContentService output.
+  // Native fetch redirect:'follow' may turn the POST into a GET on 301/302/303, which breaks API actions.
+  // Follow redirects explicitly: preserve POST for 307/308, and use GET for the Apps Script response
+  // redirect (301/302/303), whose Location contains the generated response token.
+  let target=new URL(baseUrl);
+  let method='POST';
+  let payload=JSON.stringify(body);
+  for(let hop=0;hop<5;hop++){
+    const upstream=await fetch(target.toString(),{
+      method,
+      headers:method==='POST'?{'Content-Type':'application/json','Accept':'application/json'}:{'Accept':'application/json'},
+      body:method==='POST'?payload:undefined,
+      redirect:'manual'
+    });
+    if([301,302,303,307,308].includes(upstream.status)){
+      const location=upstream.headers.get('Location');
+      if(!location)return {status:502,data:{ok:false,error:`Backend redirect for ${body.action} had no Location header.`}};
+      target=new URL(location,target);
+      if([307,308].includes(upstream.status)){
+        method='POST';
+      }else{
+        method='GET';
+      }
+      continue;
+    }
+    const type=String(upstream.headers.get('content-type')||'');
+    let text=String(await upstream.text()||'').replace(/^\uFEFF/,'').trim();
+    let data;
+    try{data=text?JSON.parse(text):{};}catch(_){
+      return {status:502,data:{ok:false,error:`Backend returned an invalid response for ${body.action}.`,detail:text.replace(/\s+/g,' ').slice(0,500),upstreamStatus:upstream.status,upstreamContentType:type||'unknown'}};
+    }
+    if(upstream.status===401||String(data.error||'').toLowerCase()==='unauthorized')return {status:401,data:{ok:false,error:'Backend authorization failed.'}};
+    return {status:upstream.status,data};
+  }
+  return {status:502,data:{ok:false,error:`Too many redirects from backend for ${body.action}.`}};
 }
 function json(data,status,request,env,cacheSeconds=0){const h=new Headers({'Content-Type':'application/json; charset=utf-8',...corsHeaders(request,env)});h.set('Cache-Control',cacheSeconds?`public, max-age=${cacheSeconds}`:'no-store, no-cache, must-revalidate');h.set('X-Content-Type-Options','nosniff');h.set('Referrer-Policy','strict-origin-when-cross-origin');h.set('X-Frame-Options','DENY');return new Response(JSON.stringify(data),{status,headers:h});}
 async function clientKey_(request){const raw=request.headers.get('CF-Connecting-IP')||'unknown';const bytes=new TextEncoder().encode(raw+'|fgbd-login-v1');const digest=await crypto.subtle.digest('SHA-256',bytes);return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('');}

@@ -1,4 +1,4 @@
-# Flash Gear BD — V1.0.27
+# Flash Gear BD — V1.0.28
 
 Customer website update based on V1.0.26.
 
@@ -12,3 +12,10 @@ Changes:
 - Product detail Add to Cart/Buy Now now respects its selected quantity too.
 - Existing V1.0.23 backend/authentication and V1.0.26 mobile dock structure are preserved.
 - No assets folder.
+
+
+## V1.0.28 Image Fix
+- Normalizes common Google Drive/Sheets image URL formats, including IMAGE("url") cells.
+- Fixed image frames across product cards, sliders, search suggestions, cart, thumbnails, and product detail.
+- Product images use contain positioning and blend with the site background frame.
+- Backend/authentication baseline remains V1.0.23.

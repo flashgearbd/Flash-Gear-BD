@@ -56,9 +56,29 @@
   }
 
   function normalizeImageUrl(url){
-    url=String(url||'');
-    const m=url.match(/drive\.google\.com\/(?:uc\?export=view&id=|file\/d\/)([A-Za-z0-9_-]+)/);
-    return m ? 'https://drive.google.com/thumbnail?id='+encodeURIComponent(m[1])+'&sz=w1600' : url;
+    let value=String(url||'').trim();
+    if(!value) return '';
+    // Handle Sheets cells that contain IMAGE("url") or quoted URLs.
+    const imageFn=value.match(/^=IMAGE\(\s*[\"']([^\"']+)[\"']/i);
+    if(imageFn) value=imageFn[1].trim();
+    value=value.replace(/^['\"]|['\"]$/g,'').trim();
+    value=value.replace(/&amp;/g,'&');
+
+    // Google Drive URLs appear in several formats depending on how they were copied.
+    // Convert every Drive file URL to a public thumbnail URL so the browser can render it reliably.
+    const drivePatterns=[
+      /drive\.google\.com\/file\/d\/([A-Za-z0-9_-]+)/i,
+      /drive\.google\.com\/(?:open|uc|thumbnail)\?(?:[^#]*&)?id=([A-Za-z0-9_-]+)/i,
+      /drive\.google\.com\/(?:uc)\?export=(?:view|download)&id=([A-Za-z0-9_-]+)/i,
+      /drive\.google\.com\/drive\/folders\/([A-Za-z0-9_-]+)/i
+    ];
+    for(const pattern of drivePatterns){
+      const match=value.match(pattern);
+      if(match && match[1]) return 'https://drive.google.com/thumbnail?id='+encodeURIComponent(match[1])+'&sz=w1600';
+    }
+    // A bare Google Drive file ID is also accepted.
+    if(/^[A-Za-z0-9_-]{20,}$/.test(value)) return 'https://drive.google.com/thumbnail?id='+encodeURIComponent(value)+'&sz=w1600';
+    return value;
   }
 
   function normalizeLiveProducts(rows) {

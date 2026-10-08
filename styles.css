@@ -502,3 +502,27 @@ footer{background:#041d3e;color:#d9e8f8;margin-top:0;padding:45px max(18px,calc(
   .quick-qty{width:100%;justify-content:space-between;}
   .quick-qty button{width:34px;}
 }
+
+
+/* FGBD V1.0.28 — reliable product images + fixed image frames */
+.product-media{height:210px !important;aspect-ratio:auto !important;background:var(--off) !important;display:block;overflow:hidden;}
+.product-image-wrap,.product-image-fallback{width:100%;height:100%;background:var(--off) !important;}
+.product-image-wrap>img{width:100%;height:100%;object-fit:contain;object-position:center;padding:10px;display:block;}
+.product-image-wrap>.product-placeholder,.product-image-fallback .product-placeholder{background:var(--off) !important;}
+.detail-media{width:100%;height:420px !important;aspect-ratio:auto !important;max-height:none !important;background:var(--off) !important;display:grid;place-items:center;overflow:hidden;}
+.detail-media .product-image-wrap,.detail-media .product-image-fallback{width:100%;height:100%;}
+.detail-media .product-image-wrap>img{padding:16px;}
+.detail-thumb{width:58px !important;height:58px !important;flex:0 0 58px !important;background:var(--off) !important;}
+.detail-thumb img{width:100%;height:100%;object-fit:contain;}
+.cart-thumb{width:70px !important;height:70px !important;background:var(--off) !important;overflow:hidden;}
+.cart-thumb .product-image-wrap,.cart-thumb .product-image-fallback{width:70px;height:70px;}
+.search-suggestion-image{width:42px !important;height:42px !important;min-width:42px !important;background:var(--off) !important;}
+.search-suggestion-image .product-image-wrap,.search-suggestion-image .product-image-fallback{width:42px;height:42px;}
+.search-suggestion-image img{width:100%;height:100%;object-fit:contain;padding:3px;}
+@media(max-width:900px){
+  .product-media{height:145px !important;}
+  .detail-media{height:min(82vw,360px) !important;}
+  .detail-media .product-image-wrap>img{padding:10px;}
+  .cart-thumb{width:55px !important;height:55px !important;}
+  .cart-thumb .product-image-wrap,.cart-thumb .product-image-fallback{width:55px;height:55px;}
+}

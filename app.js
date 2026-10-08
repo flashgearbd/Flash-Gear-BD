@@ -39,6 +39,9 @@
   let backendOnline = false;
   let liveProductsLoaded = false;
   const selectedVariants = {};
+  const quickQuantities = {};
+  let homeSliderTimer = null;
+  let homeSliderPointer = null;
 
   async function apiRequest(path, options = {}) {
     const base = (CFG.apiBaseUrl || "").replace(/\/$/, "");
@@ -193,7 +196,6 @@
         <nav class="drawer-nav drawer-quick">
           <a class="drawer-link" href="#track" onclick="closeMenu()"><span>◷</span><b>Track Order</b><em>›</em></a>
           <a class="drawer-link" href="#support" onclick="closeMenu()"><span>?</span><b>Help & Support</b><em>›</em></a>
-          <a class="drawer-link" href="#faq" onclick="closeMenu()"><span>≡</span><b>FAQs</b><em>›</em></a>
         </nav>
         <div class="drawer-help"><span>☎</span><div><b>Need Help?</b><small>We're here 11 AM – 9 PM</small></div><a href="tel:+8801601093553">Call</a></div>
         <div class="drawer-footer">Flash Gear BD · Your Gadget Partner</div>
@@ -210,11 +212,30 @@
       </nav>`;
   }
 
+  function productCartKey(p) {
+    return `${p.id}::${p.sku || p.variantId || "default"}`;
+  }
+
+  function quickQtyValue(p) {
+    const key = productCartKey(p);
+    return Math.max(1, Number(quickQuantities[key] || 1));
+  }
+
+  function changeQuickQty(id, sku, delta) {
+    const key = `${id}::${sku || "default"}`;
+    quickQuantities[key] = Math.max(1, Number(quickQuantities[key] || 1) + Number(delta || 0));
+    const el = document.querySelector(`[data-quick-qty="${CSS.escape(key)}"]`);
+    if (el) el.textContent = quickQuantities[key];
+  }
+
   function productCard(p) {
     const disabled = p.stock === "Out of Stock" ? "disabled" : "";
     const discount = p.oldPrice && Number(p.oldPrice) > Number(p.price)
       ? Math.round((1 - Number(p.price) / Number(p.oldPrice)) * 100)
       : 0;
+    const key = productCartKey(p);
+    const qty = quickQtyValue(p);
+    const safeKey = escapeHtml(key);
     return `
       <article class="product-card">
         <a href="#product/${p.id}" class="product-media">${productImage(p)}</a>
@@ -227,10 +248,19 @@
             ${p.oldPrice ? `<del>${money(p.oldPrice)}</del>` : ""}
           </div>
           <span class="${stockClass(p.stock)}">${escapeHtml(p.stock)}</span>
-          <button class="quick-add" ${disabled} onclick="addToCart('${p.id}', '${escapeHtml(p.sku || "")}')">${disabled ? "Out of Stock" : "🛒 Add to Cart"}</button>
+          <div class="quick-cart-row">
+            <div class="quick-qty" aria-label="Quantity">
+              <button type="button" ${disabled} onclick="changeQuickQty('${escapeHtml(p.id)}','${escapeHtml(p.sku || p.variantId || "")}',-1); return false;" aria-label="Decrease quantity">−</button>
+              <span data-quick-qty="${safeKey}">${qty}</span>
+              <button type="button" ${disabled} onclick="changeQuickQty('${escapeHtml(p.id)}','${escapeHtml(p.sku || p.variantId || "")}',1); return false;" aria-label="Increase quantity">+</button>
+            </div>
+            <button class="quick-add" ${disabled} onclick="addToCart('${escapeHtml(p.id)}', '${escapeHtml(p.sku || p.variantId || "")}', quickQtyValueByKey('${safeKey}'))">${disabled ? "Out of Stock" : "🛒 Add"}</button>
+          </div>
         </div>
       </article>`;
   }
+
+  function quickQtyValueByKey(key) { return Math.max(1, Number(quickQuantities[key] || 1)); }
 
   function homePage() {
     const featured = products.filter(p => p.featured).slice(0, 4);
@@ -274,12 +304,12 @@
         <section class="section product-section">
           <div class="section-head"><div><span class="eyebrow">HANDPICKED</span><h2>Featured Products</h2></div><a href="#shop">View All →</a></div>
           <div class="product-tabs"><span class="active">Featured</span><a href="#shop">Best Sellers</a><a href="#shop">New Arrivals</a><a href="#offers">Deals</a></div>
-          <div class="product-grid">${featuredProducts.length ? featuredProducts.map(productCard).join("") : `<div class="empty">Products will appear here once they are published.</div>`}</div>
+          <div class="product-slider" data-home-slider="featured"><div class="product-slider-track">${featuredProducts.length ? featuredProducts.map(productCard).join("") : `<div class="empty">Products will appear here once they are published.</div>`}</div></div>
         </section>
 
         ${deals.length ? `<section class="section soft product-section"><div class="section-head"><div><span class="eyebrow">BEST VALUE</span><h2>Flash Deals</h2></div><a href="#offers">View Deals →</a></div><div class="product-grid">${deals.map(productCard).join("")}</div></section>` : ""}
 
-        ${arrivals.length ? `<section class="section product-section"><div class="section-head"><div><span class="eyebrow">LATEST</span><h2>New Arrivals</h2></div><a href="#shop">View All →</a></div><div class="product-grid">${arrivals.map(productCard).join("")}</div></section>` : ""}
+        ${arrivals.length ? `<section class="section product-section"><div class="section-head"><div><span class="eyebrow">LATEST</span><h2>New Arrivals</h2></div><a href="#shop">View All →</a></div><div class="product-slider" data-home-slider="arrivals"><div class="product-slider-track">${arrivals.map(productCard).join("")}</div></div></section>` : ""}
 
         <section class="popular-band">
           <div class="section-head"><div><span class="eyebrow">DISCOVER MORE</span><h2>Popular Gadgets</h2></div><a href="#shop">View All →</a></div>
@@ -347,8 +377,8 @@
             <span class="${stockClass(display.stock)}">${escapeHtml(display.stock)}</span>
             <p>${escapeHtml(display.description)}</p>
             <div class="variant"><b>Variant</b><div class="chips variant-chips">${variants.map(v => `<button class="${v.sku===selectedSku?"active":""}" onclick="selectVariant('${escapeHtml(p.id)}','${escapeHtml(v.sku)}')">${escapeHtml(v.variant || v.sku || "Standard")}</button>`).join("")}</div></div>
-            <div class="buy-row"><div class="qty"><button onclick="changeTempQty(-1)">−</button><span id="tempQty">1</span><button onclick="changeTempQty(1)">+</button></div><button class="btn primary grow" ${display.stock==="Out of Stock"?"disabled":""} onclick="addToCart('${escapeHtml(display.id)}','${escapeHtml(display.sku || "")}')">Add to Cart</button></div>
-            <button class="btn outline full" ${display.stock==="Out of Stock"?"disabled":""} onclick="buyNow('${escapeHtml(display.id)}','${escapeHtml(display.sku || "")}')">Buy Now</button>
+            <div class="buy-row"><div class="qty"><button onclick="changeTempQty(-1)">−</button><span id="tempQty">1</span><button onclick="changeTempQty(1)">+</button></div><button class="btn primary grow" ${display.stock==="Out of Stock"?"disabled":""} onclick="addToCart('${escapeHtml(display.id)}','${escapeHtml(display.sku || "")}',getTempQty())">Add to Cart</button></div>
+            <button class="btn outline full" ${display.stock==="Out of Stock"?"disabled":""} onclick="buyNow('${escapeHtml(display.id)}','${escapeHtml(display.sku || "")}',getTempQty())">Buy Now</button>
             <div class="mini-trust"><span>🛡️ Authentic</span><span>🚚 Fast Delivery</span><span>↻ Easy Return</span></div>
           </div>
         </div>
@@ -466,21 +496,23 @@
     </footer>`;
   }
 
-  function addToCart(id, sku = "") {
+  function addToCart(id, sku = "", qty = 1) {
     const p = products.find(x => x.id === id);
     if (!p) return;
     const variants = Array.isArray(p.variants) && p.variants.length ? p.variants : [{ sku: p.sku || "", variantId: p.variantId || p.sku || "", variant: p.variant || "", price: p.price, oldPrice: p.oldPrice, stock: p.stock, image: p.image, images: p.images || [] }];
     const v = variants.find(x => x.sku === sku) || variants[0];
     if (!v || v.stock === "Out of Stock") return;
     const key = `${id}::${v.sku || "default"}`;
+    const amount = Math.max(1, Number(qty || 1));
     const existing = cart.find(x => x.cartKey === key);
-    if (existing) existing.qty += 1;
-    else cart.push({...p, price: Number(v.price || 0), oldPrice: Number(v.oldPrice || 0), stock: v.stock, image: normalizeImageUrl(v.image || p.image), variant: v.variant || p.variant, sku: v.sku || p.sku || "", variantId: v.variantId || v.sku || p.variantId || "", cartKey: key, qty: 1});
+    if (existing) existing.qty += amount;
+    else cart.push({...p, price: Number(v.price || 0), oldPrice: Number(v.oldPrice || 0), stock: v.stock, image: normalizeImageUrl(v.image || p.image), variant: v.variant || p.variant, sku: v.sku || p.sku || "", variantId: v.variantId || v.sku || p.variantId || "", cartKey: key, qty: amount});
     saveCart();
     toast("Added to cart ✓");
   }
 
-  function buyNow(id, sku = "") { addToCart(id, sku); location.hash = "#checkout"; }
+  function getTempQty() { return Math.max(1, Number(tempQty || 1)); }
+  function buyNow(id, sku = "", qty = 1) { addToCart(id, sku, qty); location.hash = "#checkout"; }
   function changeCart(id, delta) {
     const item = cart.find(x => (x.cartKey || x.id) === id); if (!item) return;
     item.qty += delta;
@@ -758,6 +790,65 @@
     document.body.appendChild(t); setTimeout(() => t.remove(), 2200);
   }
 
+
+  function stopHomeSliders() {
+    if (homeSliderTimer) { clearInterval(homeSliderTimer); homeSliderTimer = null; }
+    document.querySelectorAll("[data-home-slider]").forEach(slider => slider.classList.remove("is-dragging"));
+  }
+
+  function initHomeSliders() {
+    stopHomeSliders();
+    const sliders = [...document.querySelectorAll("[data-home-slider]")];
+    if (!sliders.length) return;
+    sliders.forEach(setupHomeSlider);
+    homeSliderTimer = setInterval(() => {
+      document.querySelectorAll("[data-home-slider]").forEach(slider => advanceHomeSlider(slider));
+    }, 2600);
+  }
+
+  function sliderStep(slider) {
+    const track = slider.querySelector(".product-slider-track");
+    const card = track?.querySelector(".product-card");
+    if (!track || !card) return 0;
+    const gap = parseFloat(getComputedStyle(track).gap || "0") || 0;
+    return card.getBoundingClientRect().width + gap;
+  }
+
+  function advanceHomeSlider(slider) {
+    if (Number(slider.dataset.pauseUntil || 0) > Date.now()) return;
+    const track = slider.querySelector(".product-slider-track");
+    if (!track) return;
+    const max = Math.max(0, track.scrollWidth - slider.clientWidth);
+    if (max <= 2) return;
+    const next = Math.min(track.scrollLeft + sliderStep(slider), max);
+    if (next >= max - 2) {
+      track.scrollTo({left:0, behavior:"smooth"});
+    } else {
+      track.scrollTo({left:next, behavior:"smooth"});
+    }
+  }
+
+  function setupHomeSlider(slider) {
+    const track = slider.querySelector(".product-slider-track");
+    if (!track || track.dataset.bound === "1") return;
+    track.dataset.bound = "1";
+    let startX = 0, startScroll = 0, dragging = false;
+    track.addEventListener("pointerdown", e => {
+      dragging = true; startX = e.clientX; startScroll = track.scrollLeft;
+      slider.dataset.pauseUntil = String(Date.now() + 4500);
+      slider.classList.add("is-dragging"); track.setPointerCapture?.(e.pointerId);
+    });
+    track.addEventListener("pointermove", e => {
+      if (!dragging) return;
+      track.scrollLeft = startScroll - (e.clientX - startX);
+    });
+    const end = () => { dragging = false; slider.classList.remove("is-dragging"); };
+    track.addEventListener("pointerup", e => { slider.dataset.pauseUntil = String(Date.now() + 3500); end(e); });
+    track.addEventListener("pointercancel", end);
+    track.addEventListener("pointerleave", e => { if (dragging && e.buttons === 0) end(); });
+    track.addEventListener("touchstart", () => {}, {passive:true});
+  }
+
   function render() {
     const hash = location.hash.replace(/^#/, "") || "home";
     const [path, query] = hash.split("?");
@@ -788,12 +879,16 @@
     void app.offsetWidth;
     app.classList.add("page-enter");
     updateCartCount();
+    if (path === "home") initHomeSliders();
+    else stopHomeSliders();
     if (path === "checkout") validateCheckout();
-    window.scrollTo({top:0, behavior:"auto"});
   }
 
   window.addToCart = addToCart;
+  window.changeQuickQty = changeQuickQty;
+  window.quickQtyValueByKey = quickQtyValueByKey;
   window.buyNow = buyNow;
+  window.getTempQty = getTempQty;
   window.changeCart = changeCart;
   window.removeCart = removeCart;
   window.setSearch = setSearch;
@@ -813,7 +908,7 @@
   window.validateCheckout = validateCheckout;
   window.validateCheckoutField = validateCheckoutField;
 
-  window.addEventListener("hashchange", render);
+  window.addEventListener("hashchange", () => { window.scrollTo({top:0, behavior:"auto"}); render(); });
   render();
   loadProductsFromApi();
 })();

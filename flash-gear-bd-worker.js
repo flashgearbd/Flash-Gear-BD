@@ -12,7 +12,12 @@ export default {
     if (request.method === 'OPTIONS') return corsResponse(request, env, new Response(null, {status:204}));
     if (url.pathname === '/api' || url.pathname === '/api/' || url.pathname.startsWith('/api/')) return handleApi(request, env, url);
     if (url.pathname === '/admin' || url.pathname === '/admin/' || url.pathname === '/admin.html') {
-      return env.ASSETS.fetch(new Request(new URL('/admin.html', url), request));
+      const assetResponse = await env.ASSETS.fetch(new Request(new URL('/admin.html', url), request));
+      return withNoStore(assetResponse);
+    }
+    if (url.pathname === '/admin.js' || url.pathname === '/admin.css') {
+      const assetResponse = await env.ASSETS.fetch(new Request(new URL(url.pathname, url), request));
+      return withNoStore(assetResponse);
     }
     if (url.pathname === '/shop' || url.pathname === '/offers' || url.pathname === '/new' || url.pathname.startsWith('/product/')) {
       return env.ASSETS.fetch(new Request(new URL('/index.html', url), request));
@@ -33,6 +38,7 @@ function corsHeaders(request, env){
   return {'Access-Control-Allow-Origin': origin && origin === configured ? origin : configured,'Vary':'Origin','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'Content-Type','Access-Control-Max-Age':'600'};
 }
 function corsResponse(request, env, response){const h=new Headers(response.headers);Object.entries(corsHeaders(request,env)).forEach(([k,v])=>h.set(k,v));return new Response(response.body,{status:response.status,headers:h});}
+function withNoStore(response){const h=new Headers(response.headers);h.set('Cache-Control','no-store, no-cache, must-revalidate, max-age=0');h.set('Pragma','no-cache');return new Response(response.body,{status:response.status,statusText:response.statusText,headers:h});}
 
 function rateLimit(request, key, limit=20, windowMs=60000){
   const now=Date.now(); const ip=request.headers.get('CF-Connecting-IP') || 'unknown';

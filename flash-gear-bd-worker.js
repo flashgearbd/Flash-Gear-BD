@@ -13,6 +13,11 @@ export default {
     if (url.pathname === '/api' || url.pathname === '/api/' || url.pathname.startsWith('/api/')) return handleApi(request, env, url);
     // Serve the admin shell directly. Do not redirect /admin <-> /admin.html: Cloudflare's
     // default HTML canonicalization can otherwise create a redirect loop.
+    // Explicitly serve the main SPA shell at the site root. With html_handling:
+    // 'none', relying on Static Assets for '/' can fall through to 404.html.
+    if (url.pathname === '/' || url.pathname === '/index.html') {
+      return env.ASSETS.fetch(new Request(new URL('/index.html', url), request));
+    }
     if (url.pathname === '/admin' || url.pathname === '/admin/') {
       return env.ASSETS.fetch(new Request(new URL('/admin.html', url), request));
     }

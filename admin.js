@@ -14,9 +14,12 @@
     for(const re of patterns){const m=d.match(re);if(m)return m[1]}return '';
   };
   function getGoogleDriveDirectUrl(url){const raw=String(url||'').trim().replace(/&amp;/gi,'&');if(!raw)return '';const formula=raw.match(/^=IMAGE\(\s*["']([^"']+)["']/i);const value=formula?formula[1].trim():raw;const id=driveId(value);return id?`https://lh3.googleusercontent.com/d/${encodeURIComponent(id)}`:value;}
+  // Normalize Drive sharing URLs before using them in admin preview <img> elements.
+  function fixDriveImage(url){const value=String(url||'').trim().replace(/&amp;/gi,'&');if(!value)return '';if(!/(?:drive\.google\.com|drive\.usercontent\.google\.com|lh\d+\.googleusercontent\.com)/i.test(value))return value;return getGoogleDriveDirectUrl(value)||value;}
   const imageCandidates=u=>{const raw=String(u||'').trim(),id=driveId(raw),out=[],add=x=>{if(x&&!out.includes(x))out.push(x)};if(id){add(`https://lh3.googleusercontent.com/d/${encodeURIComponent(id)}`);add(`https://lh3.googleusercontent.com/d/${encodeURIComponent(id)}=w1600`);add(`https://lh3.googleusercontent.com/d/${encodeURIComponent(id)}=w1200`);add(`https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1600`);add(`https://drive.google.com/uc?export=view&id=${encodeURIComponent(id)}`);add(`https://drive.google.com/uc?export=download&id=${encodeURIComponent(id)}`);add(`https://drive.usercontent.google.com/download?id=${encodeURIComponent(id)}&export=view&confirm=t`);if(/^https?:\/\//i.test(raw))add(raw)}else if(/^https?:\/\//i.test(raw))add(raw);return out};
-  const imageUrl=u=>imageCandidates(u)[0]||'';
+  const imageUrl=u=>fixDriveImage(imageCandidates(u)[0]||getGoogleDriveDirectUrl(u)||'');
   window.getGoogleDriveDirectUrl=getGoogleDriveDirectUrl;
+  window.fixDriveImage=fixDriveImage;
   window.adminImageError=function(img){const c=imageCandidates(img.dataset.original||img.dataset.currentOriginal||img.src);let i=Number(img.dataset.try||0);while(i<c.length&&(!c[i]||c[i]===img.src))i++;if(i<c.length){img.dataset.try=String(i+1);img.src=c[i];}else{img.onerror=null;img.style.visibility='hidden';}};
 
   function msg(id,text,error=false){const e=$(id);if(!e)return;e.textContent=text||'';e.className='message'+(error?' err':'');}

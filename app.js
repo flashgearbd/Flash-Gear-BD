@@ -109,11 +109,22 @@
     return 'https://lh3.googleusercontent.com/d/'+encodeURIComponent(id);
   }
 
+  // Explicit helper used before assigning Google Drive URLs to image elements.
+  // Keeps non-Drive image URLs unchanged and handles sharing URLs, open?id=, uc?id=,
+  // Drive thumbnail links, Apps Script IMAGE() values, and already-converted URLs.
+  function fixDriveImage(url){
+    const value=String(url||'').trim().replace(/&amp;/gi,'&');
+    if(!value)return '';
+    if(!/drive\.google\.com|drive\.usercontent\.google\.com|lh\d+\.googleusercontent\.com/i.test(value))return value;
+    const direct=getGoogleDriveDirectUrl(value);
+    return direct||value;
+  }
+
   function normalizeImageUrl(url){
     const value=String(url||'').trim();
     if(!value)return '';
     const id=extractDriveFileId(value);
-    return id ? getGoogleDriveDirectUrl(value) : value.replace(/&amp;/gi,'&');
+    return id ? fixDriveImage(value) : value.replace(/&amp;/gi,'&');
   }
 
   function imageCandidates(url){
@@ -1098,6 +1109,7 @@
   window.handleHeaderSearchInput = handleHeaderSearchInput;
   window.hideHeaderSuggestions = hideHeaderSuggestions;
   window.getGoogleDriveDirectUrl = getGoogleDriveDirectUrl;
+  window.fixDriveImage = fixDriveImage;
   window.handleImageError = handleImageError;
   window.chooseHeaderSuggestion = chooseHeaderSuggestion;
   window.setCategory = setCategory;

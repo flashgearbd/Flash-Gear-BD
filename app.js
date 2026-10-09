@@ -486,7 +486,11 @@
     const variants = Array.isArray(p.variants) && p.variants.length ? p.variants : [{ sku: p.sku || "", variantId: p.variantId || p.sku || "", variant: p.variant || "", price: p.price, oldPrice: p.oldPrice, stock: p.stock, image: p.image, images: p.images || [] }];
     const selectedSku = selectedVariants[p.id] || variants[0].sku;
     const selected = variants.find(v => v.sku === selectedSku) || variants[0];
-    const display = {...p, price: Number(selected.price || 0), oldPrice: Number(selected.oldPrice || 0), stock: selected.stock, availableStock:Number(selected.availableStock||0), image: normalizeImageUrl(selected.image || p.image), images:(selected.images||p.images||[]).map(normalizeImageUrl), sku: selected.sku, variant: selected.variant, variantId: selected.variantId};
+    const galleryImages = (Array.isArray(selected.images) && selected.images.length ? selected.images : (Array.isArray(p.images) ? p.images : [])).map(normalizeImageUrl).filter(Boolean);
+    // The thumbnail gallery may contain valid images while the legacy primary `image` field is stale.
+    // Prefer the first actual gallery image for the main detail image, then fall back to the legacy field.
+    const mainImageUrl = getGoogleDriveDirectUrl(galleryImages[0] || selected.image || p.image || "");
+    const display = {...p, price: Number(selected.price || 0), oldPrice: Number(selected.oldPrice || 0), stock: selected.stock, availableStock:Number(selected.availableStock||0), image: mainImageUrl, images:galleryImages, sku: selected.sku, variant: selected.variant, variantId: selected.variantId};
     return `
       ${header()}
       <main class="page">

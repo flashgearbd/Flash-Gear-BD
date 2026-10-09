@@ -219,10 +219,17 @@
   }
 
   function productImage(p, large = false) {
-    const src = normalizeImageUrl(p.image || (p.images || [])[0] || "");
-    const fallback = `<span class="product-placeholder ${large ? "large" : ""}" hidden><span>⚡</span><small>${escapeHtml(p.category || "Product")}</small></span>`;
+    // Use every stored image as a fallback, not just alternate URL formats for Image 1.
+    // Sheets often contain one stale/permission-blocked first image while later gallery
+    // images are valid; cards and the hero image should still display a working photo.
+    const sourceImages = [p && p.image, ...((p && Array.isArray(p.images)) ? p.images : [])]
+      .map(normalizeImageUrl).filter(Boolean);
+    const uniqueImages = [...new Set(sourceImages)];
+    const src = uniqueImages[0] || "";
+    const fallback = `<span class="product-placeholder ${large ? "large" : ""}" hidden><span>⚡</span><small>${escapeHtml((p && p.category) || "Product")}</small></span>`;
     if (!src) return `<span class="product-image-fallback">${fallback.replace(' hidden','')}</span>`;
-    return `<span class="product-image-wrap"><img src="${escapeHtml(src)}" loading="lazy" decoding="async" alt="${escapeHtml(p.name)}" onerror="handleImageError(this)" data-image-candidates="${escapeHtml(JSON.stringify(imageCandidates(src)))}">${fallback}</span>`;
+    const candidates = [...new Set(uniqueImages.flatMap(imageCandidates))];
+    return `<span class="product-image-wrap"><img src="${escapeHtml(src)}" loading="lazy" decoding="async" alt="${escapeHtml((p && p.name) || "Product image")}" onerror="handleImageError(this)" data-image-candidates="${escapeHtml(JSON.stringify(candidates))}">${fallback}</span>`;
   }
 
   function handleImageError(img) {

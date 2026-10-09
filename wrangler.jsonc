@@ -13,11 +13,12 @@
       "/api/*",
       "/admin",
       "/admin/",
+      "/product",
       "/product/*",
       "/shop",
       "/offers",
       "/new"
     ],
-    "not_found_handling": "404-page"
+    "not_found_handling": "single-page-application"
   }
 }

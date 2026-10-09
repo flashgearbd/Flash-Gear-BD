@@ -84,50 +84,52 @@
     const imageFn=raw.match(/^=IMAGE\(\s*["']([^"']+)["']/i);
     if(imageFn)raw=imageFn[1].trim();
     raw=raw.replace(/^['"]|['"]$/g,'').replace(/&amp;/gi,'&').trim();
-    // Some sheets contain a bare Drive file ID rather than a URL.
     if(/^[A-Za-z0-9_-]{20,}$/.test(raw))return raw;
-    let decoded=raw;
-    try{decoded=decodeURIComponent(raw);}catch(_){}
+    let decoded=raw;try{decoded=decodeURIComponent(raw)}catch(_){}
     const patterns=[
-      /(?:drive|docs)\.google\.com\/file\/d\/([A-Za-z0-9_-]{10,})/i,
-      /(?:drive|docs)\.google\.com\/document\/d\/([A-Za-z0-9_-]{10,})/i,
-      /(?:drive|docs)\.google\.com\/spreadsheets\/d\/([A-Za-z0-9_-]{10,})/i,
-      /(?:drive|docs)\.google\.com\/presentation\/d\/([A-Za-z0-9_-]{10,})/i,
+      /(?:drive|docs)\.google\.com\/(?:file|document|spreadsheets|presentation)\/d\/([A-Za-z0-9_-]{10,})/i,
       /(?:drive|docs)\.google\.com\/.*?[?&](?:id|fileId)=([A-Za-z0-9_-]{10,})/i,
       /drive\.usercontent\.google\.com\/download\?.*?[?&]id=([A-Za-z0-9_-]{10,})/i,
       /lh\d+\.googleusercontent\.com\/d\/([A-Za-z0-9_-]{10,})/i,
       /[?&](?:id|fileId)=([A-Za-z0-9_-]{10,})/i
     ];
-    for(const pattern of patterns){const m=decoded.match(pattern);if(m&&m[1])return m[1];}
+    for(const pattern of patterns){const m=decoded.match(pattern);if(m&&m[1])return m[1]}
     return '';
   }
 
-  function normalizeImageUrl(url){
+  // Required canonicalizer: turn Drive share links into an image endpoint before assigning img.src.
+  function getGoogleDriveDirectUrl(url){
     let value=String(url||'').trim();
     if(!value)return '';
-    const imageFn=value.match(/^=IMAGE\(\s*["']([^"']+)["']/i);
-    if(imageFn)value=imageFn[1].trim();
-    value=value.replace(/^['"]|['"]$/g,'').trim().replace(/&amp;/gi,'&');
+    value=value.replace(/&amp;/gi,'&');
+    const formula=value.match(/^=IMAGE\(\s*["']([^"']+)["']/i);
+    if(formula)value=formula[1].trim();
     const id=extractDriveFileId(value);
-    // Use the thumbnail endpoint as the primary URL; some Drive files do not serve
-    // the lh3 endpoint consistently, so imageCandidates keeps all alternatives.
-    if(id)return 'https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w1600';
-    return value;
+    if(!id)return value;
+    return 'https://lh3.googleusercontent.com/d/'+encodeURIComponent(id);
+  }
+
+  function normalizeImageUrl(url){
+    const value=String(url||'').trim();
+    if(!value)return '';
+    const id=extractDriveFileId(value);
+    return id ? getGoogleDriveDirectUrl(value) : value.replace(/&amp;/gi,'&');
   }
 
   function imageCandidates(url){
     const value=String(url||'').trim();
     if(!value)return [];
-    const id=extractDriveFileId(value);
-    const out=[];const add=u=>{if(u&&!out.includes(u))out.push(u);};
+    const id=extractDriveFileId(value),out=[];const add=u=>{if(u&&!out.includes(u))out.push(u)};
     if(id){
-      add('https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w1600');
+      // Try the requested direct URL first, then alternate Google image endpoints.
+      add('https://lh3.googleusercontent.com/d/'+encodeURIComponent(id));
       add('https://lh3.googleusercontent.com/d/'+encodeURIComponent(id)+'=w1600');
       add('https://lh3.googleusercontent.com/d/'+encodeURIComponent(id)+'=w1200');
+      add('https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w1600');
       add('https://drive.google.com/uc?export=view&id='+encodeURIComponent(id));
       add('https://drive.google.com/uc?export=download&id='+encodeURIComponent(id));
       add('https://drive.usercontent.google.com/download?id='+encodeURIComponent(id)+'&export=view&confirm=t');
-      add(value);
+      if(/^https?:\/\//i.test(value))add(value);
     }else if(/^https?:\/\//i.test(value)){add(value);}
     return out;
   }
@@ -234,21 +236,23 @@
     const sourceImages = [p && p.image, ...((p && Array.isArray(p.images)) ? p.images : [])]
       .map(normalizeImageUrl).filter(Boolean);
     const uniqueImages = [...new Set(sourceImages)];
-    const src = uniqueImages[0] || "";
+    const src = getGoogleDriveDirectUrl(uniqueImages[0] || "");
     const fallback = `<span class="product-placeholder ${large ? "large" : ""}" hidden><span>⚡</span><small>${escapeHtml((p && p.category) || "Product")}</small></span>`;
     if (!src) return `<span class="product-image-fallback">${fallback.replace(' hidden','')}</span>`;
     const candidates = [...new Set(uniqueImages.flatMap(imageCandidates))];
-    return `<span class="product-image-wrap"><img src="${escapeHtml(src)}" loading="lazy" decoding="async" alt="${escapeHtml((p && p.name) || "Product image")}" onerror="handleImageError(this)" data-image-candidates="${escapeHtml(JSON.stringify(candidates))}">${fallback}</span>`;
+    return `<span class="product-image-wrap"><img src="${escapeHtml(src)}" loading="lazy" decoding="async" alt="${escapeHtml((p && p.name) || "Product image")}" onerror="handleImageError(this)" data-image-candidates="${escapeHtml(JSON.stringify(candidates))}" data-image-candidate-index="1">${fallback}</span>`;
   }
 
   function handleImageError(img) {
     if (!img) return;
     let candidates = [];
     try { candidates = JSON.parse(img.getAttribute("data-image-candidates") || "[]"); } catch (_) {}
+    let index = Number(img.dataset.imageCandidateIndex || 0);
     const current = img.getAttribute("src") || "";
-    const next = candidates.find(u => u && u !== current);
-    if (next) {
-      img.setAttribute("src", next);
+    while (index < candidates.length && (!candidates[index] || candidates[index] === current)) index++;
+    if (index < candidates.length) {
+      img.dataset.imageCandidateIndex = String(index + 1);
+      img.setAttribute("src", candidates[index]);
       return;
     }
     img.onerror = null;
@@ -502,8 +506,16 @@
     const box=document.getElementById("detailMedia");
     if(!box) return;
     const img=box.querySelector("img");
-    if(img){ img.src=url; img.style.display="block"; }
-    document.querySelectorAll(".detail-thumb").forEach(b=>b.classList.toggle("active", b.querySelector("img")?.src===url));
+    if(img){
+      const candidates=imageCandidates(url);
+      img.setAttribute("data-image-candidates",JSON.stringify(candidates));
+      img.dataset.imageCandidateIndex="1";
+      img.onerror=()=>handleImageError(img);
+      img.src=getGoogleDriveDirectUrl(url)||url;
+      img.style.display="block";
+      const fallback=img.nextElementSibling;if(fallback)fallback.hidden=true;
+    }
+    document.querySelectorAll(".detail-thumb").forEach(b=>b.classList.toggle("active", b.querySelector("img")?.getAttribute("src")===url));
   }
 
   function selectVariant(productId, sku) {
@@ -1085,6 +1097,7 @@
   window.submitHeaderSearch = submitHeaderSearch;
   window.handleHeaderSearchInput = handleHeaderSearchInput;
   window.hideHeaderSuggestions = hideHeaderSuggestions;
+  window.getGoogleDriveDirectUrl = getGoogleDriveDirectUrl;
   window.handleImageError = handleImageError;
   window.chooseHeaderSuggestion = chooseHeaderSuggestion;
   window.setCategory = setCategory;

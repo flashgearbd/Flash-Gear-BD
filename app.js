@@ -79,21 +79,27 @@
   }
 
   function extractDriveFileId(value){
-    const raw=String(value||'').trim();
+    let raw=String(value||'').trim();
     if(!raw)return '';
+    const imageFn=raw.match(/^=IMAGE\(\s*["']([^"']+)["']/i);
+    if(imageFn)raw=imageFn[1].trim();
+    raw=raw.replace(/^['"]|['"]$/g,'').replace(/&amp;/gi,'&').trim();
+    // Some sheets contain a bare Drive file ID rather than a URL.
+    if(/^[A-Za-z0-9_-]{20,}$/.test(raw))return raw;
+    let decoded=raw;
+    try{decoded=decodeURIComponent(raw);}catch(_){}
     const patterns=[
-      /drive\.google\.com\/file\/d\/([A-Za-z0-9_-]{10,})/i,
-      /drive\.google\.com\/open\?[^#]*\bid=([A-Za-z0-9_-]{10,})/i,
-      /drive\.google\.com\/uc\?[^#]*\bid=([A-Za-z0-9_-]{10,})/i,
-      /drive\.google\.com\/thumbnail\?[^#]*\bid=([A-Za-z0-9_-]{10,})/i,
-      /drive\.google\.com\/drive\/u\/\d+\/folders\/([A-Za-z0-9_-]{10,})/i,
-      /drive\.google\.com\/drive\/folders\/([A-Za-z0-9_-]{10,})/i,
-      /drive\.usercontent\.google\.com\/download\?[^#]*\bid=([A-Za-z0-9_-]{10,})/i,
-      /[?&](?:id|fileId)=([A-Za-z0-9_-]{10,})/i,
-      /lh\d+\.googleusercontent\.com\/d\/([A-Za-z0-9_-]{10,})/i
+      /(?:drive|docs)\.google\.com\/file\/d\/([A-Za-z0-9_-]{10,})/i,
+      /(?:drive|docs)\.google\.com\/document\/d\/([A-Za-z0-9_-]{10,})/i,
+      /(?:drive|docs)\.google\.com\/spreadsheets\/d\/([A-Za-z0-9_-]{10,})/i,
+      /(?:drive|docs)\.google\.com\/presentation\/d\/([A-Za-z0-9_-]{10,})/i,
+      /(?:drive|docs)\.google\.com\/.*?[?&](?:id|fileId)=([A-Za-z0-9_-]{10,})/i,
+      /drive\.usercontent\.google\.com\/download\?.*?[?&]id=([A-Za-z0-9_-]{10,})/i,
+      /lh\d+\.googleusercontent\.com\/d\/([A-Za-z0-9_-]{10,})/i,
+      /[?&](?:id|fileId)=([A-Za-z0-9_-]{10,})/i
     ];
-    for(const pattern of patterns){const m=raw.match(pattern);if(m&&m[1])return m[1];}
-    return /^[A-Za-z0-9_-]{20,}$/.test(raw)?raw:'';
+    for(const pattern of patterns){const m=decoded.match(pattern);if(m&&m[1])return m[1];}
+    return '';
   }
 
   function normalizeImageUrl(url){
@@ -101,9 +107,11 @@
     if(!value)return '';
     const imageFn=value.match(/^=IMAGE\(\s*["']([^"']+)["']/i);
     if(imageFn)value=imageFn[1].trim();
-    value=value.replace(/^['"]|['"]$/g,'').trim().replace(/&amp;/g,'&');
+    value=value.replace(/^['"]|['"]$/g,'').trim().replace(/&amp;/gi,'&');
     const id=extractDriveFileId(value);
-    if(id)return 'https://lh3.googleusercontent.com/d/'+encodeURIComponent(id)+'=w1600';
+    // Use the thumbnail endpoint as the primary URL; some Drive files do not serve
+    // the lh3 endpoint consistently, so imageCandidates keeps all alternatives.
+    if(id)return 'https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w1600';
     return value;
   }
 
@@ -111,14 +119,15 @@
     const value=String(url||'').trim();
     if(!value)return [];
     const id=extractDriveFileId(value);
-    const out=[]; const add=u=>{if(u&&!out.includes(u))out.push(u);};
-    if(/^https?:\/\//i.test(value)&&!id)add(value);
+    const out=[];const add=u=>{if(u&&!out.includes(u))out.push(u);};
     if(id){
+      add('https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w1600');
       add('https://lh3.googleusercontent.com/d/'+encodeURIComponent(id)+'=w1600');
       add('https://lh3.googleusercontent.com/d/'+encodeURIComponent(id)+'=w1200');
-      add('https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w1600');
       add('https://drive.google.com/uc?export=view&id='+encodeURIComponent(id));
+      add('https://drive.google.com/uc?export=download&id='+encodeURIComponent(id));
       add('https://drive.usercontent.google.com/download?id='+encodeURIComponent(id)+'&export=view&confirm=t');
+      add(value);
     }else if(/^https?:\/\//i.test(value)){add(value);}
     return out;
   }
@@ -470,7 +479,7 @@
         <div class="product-detail">
           <div class="detail-gallery">
             <div class="detail-media" id="detailMedia">${productImage(display, true)}</div>
-            ${(display.images && display.images.length > 1) ? `<div class="detail-thumbs">${display.images.slice(0,6).map((im,i)=>`<button class="detail-thumb ${normalizeImageUrl(im)===normalizeImageUrl(display.image)?"active":""}" type="button" onclick="selectProductImage('${escapeHtml(normalizeImageUrl(im))}')"><img src="${escapeHtml(normalizeImageUrl(im))}" loading="lazy" alt="${escapeHtml(display.name)} image ${i+1}"></button>`).join("")}</div>` : ""}
+            ${(display.images && display.images.length > 1) ? `<div class="detail-thumbs">${display.images.slice(0,6).map((im,i)=>`<button class="detail-thumb ${normalizeImageUrl(im)===normalizeImageUrl(display.image)?"active":""}" type="button" onclick="selectProductImage('${escapeHtml(normalizeImageUrl(im))}')"><img src="${escapeHtml(imageCandidates(im)[0]||normalizeImageUrl(im))}" data-image-candidates="${escapeHtml(JSON.stringify(imageCandidates(im)))}" onerror="handleImageError(this)" loading="lazy" alt="${escapeHtml(display.name)} image ${i+1}"></button>`).join("")}</div>` : ""}
           </div>
           <div class="detail-info">
             <span class="eyebrow">${escapeHtml(display.category)}</span>

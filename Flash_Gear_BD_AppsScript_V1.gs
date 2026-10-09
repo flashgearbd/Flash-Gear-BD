@@ -115,33 +115,37 @@ function createOrder_(b){
 }
 
 function driveFileId_(value){
-  const raw=String(value||'').trim(); if(!raw)return '';
+  let raw=String(value||'').trim(); if(!raw)return '';
+  const formula=raw.match(/^=IMAGE\(\s*["']([^"']+)["']/i); if(formula)raw=formula[1].trim();
+  raw=raw.replace(/^['"]|['"]$/g,'').replace(/&amp;/gi,'&').trim();
+  if(/^[A-Za-z0-9_-]{20,}$/.test(raw))return raw;
+  let decoded=raw; try{decoded=decodeURIComponent(raw);}catch(_){}
   const patterns=[
-    /drive\.google\.com\/file\/d\/([A-Za-z0-9_-]{10,})/i,
-    /drive\.google\.com\/open\?[^#]*\bid=([A-Za-z0-9_-]{10,})/i,
-    /drive\.google\.com\/uc\?[^#]*\bid=([A-Za-z0-9_-]{10,})/i,
-    /drive\.google\.com\/thumbnail\?[^#]*\bid=([A-Za-z0-9_-]{10,})/i,
-    /drive\.usercontent\.google\.com\/download\?[^#]*\bid=([A-Za-z0-9_-]{10,})/i,
-    /[?&](?:id|fileId)=([A-Za-z0-9_-]{10,})/i,
-    /lh\d+\.googleusercontent\.com\/d\/([A-Za-z0-9_-]{10,})/i
+    /(?:drive|docs)\.google\.com\/file\/d\/([A-Za-z0-9_-]{10,})/i,
+    /(?:drive|docs)\.google\.com\/(?:document|spreadsheets|presentation)\/d\/([A-Za-z0-9_-]{10,})/i,
+    /(?:drive|docs)\.google\.com\/.*?[?&](?:id|fileId)=([A-Za-z0-9_-]{10,})/i,
+    /drive\.usercontent\.google\.com\/download\?.*?[?&]id=([A-Za-z0-9_-]{10,})/i,
+    /lh\d+\.googleusercontent\.com\/d\/([A-Za-z0-9_-]{10,})/i,
+    /[?&](?:id|fileId)=([A-Za-z0-9_-]{10,})/i
   ];
-  for(const re of patterns){const m=raw.match(re);if(m&&m[1])return m[1];}
-  return /^[A-Za-z0-9_-]{20,}$/.test(raw)?raw:'';
+  for(const re of patterns){const m=decoded.match(re);if(m&&m[1])return m[1];}
+  return '';
 }
 function imageUrl_(value){
   let raw=String(value||'').trim(); if(!raw)return '';
-  const fn=raw.match(/^=IMAGE\(\s*["']([^"']+)["']/i); if(fn)raw=fn[1].trim();
-  raw=raw.replace(/^['"]|['"]$/g,'').trim().replace(/&amp;/g,'&');
+  const formula=raw.match(/^=IMAGE\(\s*["']([^"']+)["']/i); if(formula)raw=formula[1].trim();
+  raw=raw.replace(/^['"]|['"]$/g,'').replace(/&amp;/gi,'&').trim();
   const id=driveFileId_(raw);
-  return id?'https://lh3.googleusercontent.com/d/'+encodeURIComponent(id)+'=w1600':raw;
+  return id?'https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w1600':raw;
 }
 function imageUrls_(value){
-  const raw=String(value||'').trim(),id=driveFileId_(raw),out=[];
-  const add=u=>{if(u&&!out.includes(u))out.push(u);};
+  const raw=String(value||'').trim(),id=driveFileId_(raw),out=[]; const add=u=>{if(u&&out.indexOf(u)<0)out.push(u);};
   if(id){
-    add('https://lh3.googleusercontent.com/d/'+encodeURIComponent(id)+'=w1600');
     add('https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w1600');
+    add('https://lh3.googleusercontent.com/d/'+encodeURIComponent(id)+'=w1600');
+    add('https://lh3.googleusercontent.com/d/'+encodeURIComponent(id)+'=w1200');
     add('https://drive.google.com/uc?export=view&id='+encodeURIComponent(id));
+    add('https://drive.google.com/uc?export=download&id='+encodeURIComponent(id));
     add('https://drive.usercontent.google.com/download?id='+encodeURIComponent(id)+'&export=view&confirm=t');
   }else if(raw)add(imageUrl_(raw));
   return out;

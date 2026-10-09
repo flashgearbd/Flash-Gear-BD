@@ -15,3 +15,8 @@ Supported SPA entry points:
 - `/shop`
 - `/offers`
 - `/new`
+
+
+## Google Drive image requirements
+
+Image URL normalization now supports common Drive sharing URLs, direct IDs, IMAGE() formulas, thumbnail URLs, and googleusercontent URLs, with fallback candidates in the storefront and admin. The underlying file must still be accessible to the intended viewer (typically General access: Anyone with the link, Viewer). URL conversion cannot bypass a private Drive file or Google Workspace access restrictions.
